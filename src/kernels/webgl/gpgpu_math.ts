@@ -104,6 +104,52 @@ export function compileProgram<T extends Tensor, K extends Tensor>(
   };
 }
 
+export function compileCSProgram<T extends Tensor, K extends Tensor>(
+    gpgpu: GPGPUContext, program: GPGPUProgram, inputs: Array<TensorData<T>>,
+    output: TensorData<K>): GPGPUBinary {
+  const userCode = program.userCode;
+  const inputInfos = inputs.map((input, i) => {
+    const shapeInfo = {
+      logicalShape: input.tensor.shape,
+      texShape: input.texData.texShape
+    };
+    return { name: program.variableNames[i], shapeInfo };
+  });
+  const inShapeInfos = inputInfos.map(x => x.shapeInfo);
+  const outShapeInfo = {
+    logicalShape: output.tensor.shape,
+    texShape: output.texData.texShape
+  };
+  const source = shader_compiler.makeCSShader(
+      inputInfos, outShapeInfo, userCode,
+      program.supportsBroadcasting === true);
+
+  const webGLProgram = gpgpu.createCSProgram(source);
+
+  const uniformLocations: { [name: string]: WebGLUniformLocation } = {};
+  for (let i = 0; i < program.variableNames.length; i++) {
+    const uniformName = program.variableNames[i];
+    uniformLocations[uniformName] =
+        gpgpu.getUniformLocation(webGLProgram, uniformName);
+  }
+
+  if (shouldUploadNaNUniform()) {
+    const throwIfNaNUniformIsNotUsed = false;
+    uniformLocations[NAN_UNIFORM_NAME] = gpgpu.getUniformLocation(
+        webGLProgram, NAN_UNIFORM_NAME, throwIfNaNUniformIsNotUsed);
+  }
+
+  return {
+    program,
+    source,
+    webGLProgram,
+    uniformLocations,
+    gpgpu,
+    inShapeInfos,
+    outShapeInfo
+  };
+}
+
 function validateBinaryAndProgram(
     shapeInfos: ShapeInfo[], inputs: TensorData[]) {
   if (shapeInfos.length !== inputs.length) {
@@ -189,6 +235,35 @@ export function runProgram<T extends Tensor, K extends Tensor>(
     customSetup(gpgpu, binary.webGLProgram);
   }
   gpgpu.executeProgram();
+}
+
+export function runCSProgram<T extends Tensor, K extends Tensor>(
+    binary: GPGPUBinary, inputs: Array<TensorData<T>>, output: TensorData<K>,
+    customSetup?: (gpgpu: GPGPUContext, webGLProgram: WebGLProgram) =>
+        void): void {
+  validateBinaryAndProgram(binary.inShapeInfos, inputs);
+  validateBinaryAndProgram([binary.outShapeInfo], [output]);
+
+  const outTex = output.texData.texture;
+  const outTexShape = output.texData.texShape;
+  const gpgpu = binary.gpgpu;
+  gpgpu.setOutputMatrixTextureCS(outTex, outTexShape[0], outTexShape[1]);
+  gpgpu.setProgram(binary.webGLProgram);
+  inputs.forEach((input, i) => {
+    const tex = input.texData.texture;
+    const variableName = binary.program.variableNames[i];
+    const variableUniformLocation = binary.uniformLocations[variableName];
+    gpgpu.setInputMatrixTexture(tex, variableUniformLocation, i);
+  });
+
+  if (shouldUploadNaNUniform()) {
+    gpgpu.gl.uniform1f(binary.uniformLocations[NAN_UNIFORM_NAME], NaN);
+  }
+
+  if (customSetup != null) {
+    customSetup(gpgpu, binary.webGLProgram);
+  }
+  gpgpu.executeCSProgram(outTexShape[0], outTexShape[1]);
 }
 
 export function makeShaderKey(

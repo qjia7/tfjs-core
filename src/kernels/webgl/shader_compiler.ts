@@ -84,6 +84,56 @@ export function makeShader(
   return source;
 }
 
+export function makeCSShader(
+    inputsInfo: InputInfo[], outputShape: ShapeInfo, userCode: string,
+    usesPackedTextures: boolean): string {
+  const prefixSnippets: string[] = [];
+  inputsInfo.forEach(x => {
+    const size = util.sizeFromShape(x.shapeInfo.logicalShape);
+
+    // Snippet when we decided to upload the values as uniform.
+    if (x.shapeInfo.isUniform) {
+      prefixSnippets.push(
+          `uniform float ${x.name}${size > 1 ? `[${size}]` : ''};`);
+    } else {
+      prefixSnippets.push(`uniform sampler2D ${x.name};`);
+      prefixSnippets.push(`uniform int offset${x.name};`);
+    }
+  });
+  const inputPrefixSnippet = prefixSnippets.join('\n');
+
+  const inputSamplingSnippet =
+      inputsInfo
+          .map(x => getInputSamplingSnippet(x, outputShape, usesPackedTextures))
+          .join('\n');
+  const outTexShape = outputShape.texShape;
+  const glsl = getGlslDifferences();
+  const floatTextureSampleSnippet = getFloatTextureSampleSnippet(glsl);
+  let outputSamplingSnippet: string;
+  let floatTextureSetOutputSnippet: string;
+  let shaderPrefix = getShaderPrefix(glsl);
+
+  if (outputShape.isPacked) {
+    outputSamplingSnippet =
+        getPackedOutputSamplingSnippet(outputShape.logicalShape, outTexShape);
+    floatTextureSetOutputSnippet = getFloatTextureSetRGBASnippet(glsl);
+  } else {
+    outputSamplingSnippet =
+        getOutputSamplingSnippet(outputShape.logicalShape, outTexShape);
+    floatTextureSetOutputSnippet = getFloatTextureSetRSnippet(glsl);
+  }
+
+  if (usesPackedTextures) {
+    shaderPrefix += SHADER_PACKED_PREFIX;
+  }
+
+  const source = [
+    shaderPrefix, floatTextureSampleSnippet, floatTextureSetOutputSnippet,
+    inputPrefixSnippet, outputSamplingSnippet, inputSamplingSnippet, userCode
+  ].join('\n');
+  return source;
+}
+
 function getSamplerFromInInfo(inInfo: InputInfo): string {
   const shape = inInfo.shapeInfo.logicalShape;
   switch (shape.length) {
@@ -1380,6 +1430,59 @@ function getSamplerAtOutputCoords(
       ${type} coords = getOutputCoords();
       ${coordsSnippet}
       return get${texFuncSnippet}(${unpackedCoordsSnippet});
+    }
+  `;
+}
+
+function getSamplerAtOutputCoordsCS(
+  inputInfo: InputInfo, outShapeInfo: ShapeInfo,
+  supportsBroadcasting: boolean) {
+  const inTexShape = inputInfo.shapeInfo.texShape;
+  const texName = inputInfo.name;
+
+  const texFuncSnippet = texName.charAt(0).toUpperCase() + texName.slice(1);
+  const funcName = 'get' + texFuncSnippet + 'AtOutCoords';
+
+  const broadcastDims = broadcast_util.getBroadcastDims(
+    inputInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape);
+  const inRank = inputInfo.shapeInfo.logicalShape.length;
+  const outRank = outShapeInfo.logicalShape.length;
+  const doBroadcast =
+    supportsBroadcasting && ((outRank > inRank) || broadcastDims.length > 0);
+  const broadcastOverOuter =
+    broadcast_util.broadcastDimsAreOuter(broadcastDims);
+  if (doBroadcast && !broadcastOverOuter) {
+    return getBroadcastOutputCoordsSampler(
+      inputInfo, outShapeInfo, texFuncSnippet, funcName);
+  }
+
+  const outTexShape = outShapeInfo.texShape;
+  if (util.arraysEqual(inTexShape, outTexShape)) {
+    return `
+      float ${funcName}() {
+        return sampleTexture(${texName}, ivec2(gl_GlobalInvocationID.xy));
+      }
+    `;
+  }
+
+  const inSize = util.sizeFromShape(inTexShape);
+  let broadcastSnippet = '';
+  if (doBroadcast && broadcastOverOuter) {
+    broadcastSnippet = `
+        int mainPart = index / ${inSize};
+        index -= mainPart * ${inSize};
+      `;
+  }
+  return `
+    float ${funcName}() {
+      int index = int(gl_GlobalInvocationID.y) * ${outTexShape[1]} +
+                  int(gl_GlobalInvocationID.x);
+      ${broadcastSnippet}
+      int texR = index / ${inTexShape[1]};
+      int texC = index - texR * ${inTexShape[1]};
+      ivec2 uv = ivec2(texC, texR);
+
+      return sampleTexture(${texName}, uv);
     }
   `;
 }
