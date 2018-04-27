@@ -138,9 +138,8 @@ function createAndConfigureTexture(
       gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
   webgl_util.callAndCheck(
       gl,
-      () => gl.texImage2D(
-          tex2d, 0, internalFormat, width, height, 0, textureFormat,
-          textureType, null));
+      // tslint:disable-next-line:no-any
+      () => (gl as any).texStorage2D(tex2d, 1, internalFormat, width, height));
   webgl_util.callAndCheck(gl, () => gl.bindTexture(gl.TEXTURE_2D, null));
   return texture;
 }

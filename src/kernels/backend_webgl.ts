@@ -844,7 +844,7 @@ export class MathBackendWebGL implements KernelBackend {
     }
     const program = new BinaryOpProgram(binaryop_gpu.MUL, a.shape, b.shape);
     const output = this.makeOutputArray(program.outputShape, a.dtype) as Tensor;
-    return this.compileAndRun(program, [a, b], output) as Tensor;
+    return this.compileAndRunCS(program, [a, b], output) as Tensor;
   }
 
   batchNormalization(
@@ -2341,6 +2341,43 @@ export class MathBackendWebGL implements KernelBackend {
     }
     return output;
   }
+
+  private compileAndRunCS<T extends Tensor, K extends Tensor>(
+    program: GPGPUProgram, inputs: T[], output?: K,
+    customSetup?: (gpgpu: GPGPUContext, webGLProgram: WebGLProgram) => void):
+    K {
+  if (output == null) {
+    output = this.makeOutputArray(program.outputShape, inputs[0].dtype);
+  }
+  const inputsData: Array<TensorData<T>> = inputs.map(input => {
+    this.uploadToGPU(input.dataId);
+    return {tensor: input, texData: this.texData.get(input.dataId)};
+  });
+  this.uploadToGPU(output.dataId);
+  const outputData = {
+    tensor: output,
+    texData: this.texData.get(output.dataId)
+  };
+  const key = gpgpu_math.makeShaderKey(program, inputsData, outputData);
+  const binary = this.getAndSaveBinary(key, () => {
+    return gpgpu_math.compileCSProgram(
+        this.gpgpu, program, inputsData, outputData);
+  });
+
+  const shouldTimeProgram = this.activeTimers != null;
+  let query: WebGLQuery|CPUTimerQuery;
+  if (shouldTimeProgram) {
+    query = this.startTimer();
+  }
+
+  gpgpu_math.runCSProgram(binary, inputsData, outputData, customSetup);
+
+  if (shouldTimeProgram) {
+    query = this.endTimer(query);
+    this.activeTimers.push(this.getQueryTime(query));
+  }
+  return output;
+}
 
   private getAndSaveBinary(key: string, getBinary: () => GPGPUBinary):
       GPGPUBinary {
