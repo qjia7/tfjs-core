@@ -127,6 +127,22 @@ export function createFragmentShader(
   return fragmentShader;
 }
 
+export function createComputeShader(
+  gl: WebGLRenderingContext, computeShaderSource: string): WebGLShader {
+const computeShader: WebGLShader = throwIfNull<WebGLShader>(
+    // tslint:disable-next-line:no-any
+    gl, () => gl.createShader((gl as any).COMPUTE_SHADER),
+    'Unable to create compute WebGLShader.');
+callAndCheck(gl, () => gl.shaderSource(computeShader, computeShaderSource));
+callAndCheck(gl, () => gl.compileShader(computeShader));
+if (gl.getShaderParameter(computeShader, gl.COMPILE_STATUS) === false) {
+  logShaderSourceAndInfoLog(
+    computeShaderSource, gl.getShaderInfoLog(computeShader));
+  throw new Error('Failed to compile compute shader.');
+}
+return computeShader;
+}
+
 const lineNumberRegex = /ERROR: [0-9]+:([0-9]+):/g;
 function logShaderSourceAndInfoLog(
     shaderSource: string, shaderInfoLog: string) {
@@ -317,6 +333,22 @@ export function bindColorTextureToFramebuffer(
       gl,
       () => gl.framebufferTexture2D(
           gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0));
+}
+
+export function bindColorTextureToFramebufferCS(
+    gl: WebGLRenderingContext, texture: WebGLTexture,
+    framebuffer: WebGLFramebuffer) {
+  callAndCheck(gl, () => gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer));
+  callAndCheck(
+    gl,
+    () => gl.framebufferTexture2D(
+      gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0));
+  callAndCheck(
+      gl,
+      // tslint:disable-next-line:no-any
+      () => (gl as any).bindImageTexture(4, texture, 0, (gl as any).FALSE,
+          // tslint:disable-next-line:no-any
+          0, (gl as any).WRITE_ONLY, (gl as any).R32F));
 }
 
 export function unbindColorTextureFromFramebuffer(

@@ -50,16 +50,43 @@ export function makeShader(
   return source;
 }
 
+export function makeCSShader(
+      inputsInfo: InputInfo[], outputShape: ShapeInfo, userCode: string,
+      broadcast: boolean): string {
+  const sampleSnippet = getSampleSnippetCS();
+  const setOutputSnippet = getSetOutputSnippetCS();
+  const inputPrefixSnippet =
+      inputsInfo.map(x => `uniform sampler2D ${x.name};`).join('\n');
+  const inputSamplingSnippet =
+      inputsInfo.map(x => getInputSamplingSnippetCS(x, outputShape, broadcast))
+          .join('\n');
+  const source = [
+    CS_SHADER_PREFIX, sampleSnippet, setOutputSnippet, inputPrefixSnippet,
+    inputSamplingSnippet, userCode
+  ].join('\n');
+  return source;
+}
+
 function getSampleSnippet() {
   return ENV.get('WEBGL_FLOAT_TEXTURE_ENABLED') ?
       FLOAT_TEXTURE_SAMPLE_SNIPPET :
       UNSIGNED_BYTE_TEXTURE_SAMPLE_SNIPPET;
 }
 
+function getSampleSnippetCS() {
+  return ENV.get('WEBGL_FLOAT_TEXTURE_ENABLED') ?
+      FLOAT_TEXTURE_SAMPLE_SNIPPET_CS : '';
+}
+
 function getSetOutputSnippet() {
   return ENV.get('WEBGL_FLOAT_TEXTURE_ENABLED') ?
       FLOAT_TEXTURE_SETOUTPUT_SNIPPET :
       UNSIGNED_BYTE_TEXTURE_SETOUTPUT_SNIPPET;
+}
+
+function getSetOutputSnippetCS() {
+  return ENV.get('WEBGL_FLOAT_TEXTURE_ENABLED') ?
+      FLOAT_TEXTURE_SETOUTPUT_SNIPPET_CS : '';
 }
 
 function getSamplerFromInInfo(inInfo: InputInfo): string {
@@ -94,6 +121,21 @@ function getInputSamplingSnippet(
       util.arraysEqual(
           inInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape)) {
     res += getSamplerAtOutputCoords(inInfo, outShapeInfo, broadcast);
+  }
+  return res;
+}
+
+function getInputSamplingSnippetCS(
+    inInfo: InputInfo, outShapeInfo: ShapeInfo, broadcast: boolean): string {
+  let res;
+
+  // If input and output have matching logical shapes, add
+  // getTexNameAtOutCoord() method that samples the input
+  // textureSampler using the output coordinates.
+  if (broadcast ||
+      util.arraysEqual(
+          inInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape)) {
+    res = getSamplerAtOutputCoordsCS(inInfo, outShapeInfo, broadcast);
   }
   return res;
 }
@@ -223,9 +265,21 @@ const FLOAT_TEXTURE_SAMPLE_SNIPPET = `
   }
 `;
 
+const FLOAT_TEXTURE_SAMPLE_SNIPPET_CS = `
+  float sampleTexture(sampler2D textureSampler, ivec2 uv) {
+    return texelFetch(textureSampler, uv, 0).r;
+  }
+`;
+
 const FLOAT_TEXTURE_SETOUTPUT_SNIPPET = `
   void setOutput(float val) {
     gl_FragColor = vec4(val, 0, 0, 0);
+  }
+`;
+
+const FLOAT_TEXTURE_SETOUTPUT_SNIPPET_CS = `
+  void setOutput(float val) {
+    imageStore(outColor, ivec2(gl_GlobalInvocationID.xy), vec4(val, 0, 0, 0));
   }
 `;
 
@@ -272,6 +326,37 @@ const SHADER_PREFIX = `
   ${SAMPLE_2D_SNIPPET}
   ${SAMPLE_3D_SNIPPET}
   ${SAMPLE_4D_SNIPPET}
+`;
+
+const CS_SHADER_PREFIX = `#version 310 es
+  #define TILE_WIDTH 32
+  #define TILE_HEIGHT 32
+  precision highp float;
+  precision highp int;
+  layout(local_size_x=TILE_WIDTH, local_size_y=TILE_HEIGHT) in;
+  layout(r32f, binding = 4) writeonly uniform highp image2D outColor;
+  const vec2 halfCR = vec2(0.5, 0.5);
+
+  bool isNaN(float val) {
+    float v1 = val * val;
+    float v2 = val * val;
+    return v1 == v2 ? false : true;
+  }
+
+  bool hasNaN(vec4 values) {
+    vec4 v1 = values * values;
+    vec4 v2 = values * values;
+    return any(notEqual(v1, v2));
+  }
+
+  float getNaN(vec4 values) {
+    return dot(vec4(1), values);
+  }
+
+  const vec2 randomConst = vec2(
+    23.14069263277926, // e^pi (Gelfond's constant)
+     2.665144142690225 // 2^sqrt(2) (Gelfond–Schneider constant)
+  );
 `;
 
 function getOutputScalarCoords() {
@@ -702,6 +787,59 @@ function getSamplerAtOutputCoords(
       int texC = index - texR * ${inTexShape[1]};
       vec2 uv = (vec2(texC, texR) + halfCR) /
                  vec2(${inTexShape[1]}.0, ${inTexShape[0]}.0);
+
+      return sampleTexture(${texName}, uv);
+    }
+  `;
+}
+
+function getSamplerAtOutputCoordsCS(
+  inputInfo: InputInfo, outShapeInfo: ShapeInfo,
+  supportsBroadcasting: boolean) {
+  const inTexShape = inputInfo.shapeInfo.texShape;
+  const texName = inputInfo.name;
+
+  const texFuncSnippet = texName.charAt(0).toUpperCase() + texName.slice(1);
+  const funcName = 'get' + texFuncSnippet + 'AtOutCoords';
+
+  const broadcastDims = broadcast_util.getBroadcastDims(
+    inputInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape);
+  const inRank = inputInfo.shapeInfo.logicalShape.length;
+  const outRank = outShapeInfo.logicalShape.length;
+  const doBroadcast =
+    supportsBroadcasting && ((outRank > inRank) || broadcastDims.length > 0);
+  const broadcastOverOuter =
+    broadcast_util.broadcastDimsAreOuter(broadcastDims);
+  if (doBroadcast && !broadcastOverOuter) {
+    return getBroadcastOutputCoordsSampler(
+      inputInfo, outShapeInfo, texFuncSnippet, funcName);
+  }
+
+  const outTexShape = outShapeInfo.texShape;
+  if (util.arraysEqual(inTexShape, outTexShape)) {
+    return `
+      float ${funcName}() {
+        return sampleTexture(${texName}, ivec2(gl_GlobalInvocationID.xy));
+      }
+    `;
+  }
+
+  const inSize = util.sizeFromShape(inTexShape);
+  let broadcastSnippet = '';
+  if (doBroadcast && broadcastOverOuter) {
+    broadcastSnippet = `
+        int mainPart = index / ${inSize};
+        index -= mainPart * ${inSize};
+      `;
+  }
+  return `
+    float ${funcName}() {
+      int index = int(gl_GlobalInvocationID.y) * ${outTexShape[1]} +
+                  int(gl_GlobalInvocationID.x);
+      ${broadcastSnippet}
+      int texR = index / ${inTexShape[1]};
+      int texC = index - texR * ${inTexShape[1]};
+      ivec2 uv = ivec2(texC, texR);
 
       return sampleTexture(${texName}, uv);
     }

@@ -128,7 +128,6 @@ function createAndConfigureTexture(
 
   const tex2d = gl.TEXTURE_2D;
   const internalFormat = getTextureInternalFormat(gl, numChannels);
-  const format = getTextureFormat(gl, numChannels);
   webgl_util.callAndCheck(gl, () => gl.bindTexture(tex2d, texture));
   webgl_util.callAndCheck(
       gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
@@ -140,9 +139,8 @@ function createAndConfigureTexture(
       gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
   webgl_util.callAndCheck(
       gl,
-      () => gl.texImage2D(
-          tex2d, 0, internalFormat, width, height, 0, format,
-          getTextureType(gl), null));
+      // tslint:disable-next-line:no-any
+      () => (gl as any).texStorage2D(tex2d, 1, internalFormat, width, height));
   webgl_util.callAndCheck(gl, () => gl.bindTexture(gl.TEXTURE_2D, null));
   return texture;
 }
