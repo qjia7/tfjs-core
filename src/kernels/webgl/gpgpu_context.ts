@@ -111,6 +111,11 @@ export class GPGPUContext {
     return gpgpu_util.createMatrixTexture(this.gl, rows, columns);
   }
 
+  public createTempMatrixTexture(rows: number, columns: number): WebGLTexture {
+    this.throwIfDisposed();
+    return gpgpu_util.createTempMatrixTexture(this.gl, rows, columns);
+  }
+
   public uploadPixelDataToTexture(
       texture: WebGLTexture,
       pixels: ImageData|HTMLImageElement|HTMLCanvasElement) {
