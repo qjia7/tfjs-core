@@ -75,6 +75,32 @@ export class TextureManager {
     return newTexture;
   }
 
+  acquireTempTexture(shapeRC: [number, number], texType = TextureType.FLOAT):
+      WebGLTexture {
+    const shapeKey = getKeyFromTextureShape(shapeRC, texType);
+    if (!(shapeKey in this.freeTextures)) {
+      this.freeTextures[shapeKey] = [];
+    }
+    if (!(shapeKey in this.usedTextureCount)) {
+      this.usedTextureCount[shapeKey] = 0;
+    }
+    this.usedTextureCount[shapeKey]++;
+
+    if (this.freeTextures[shapeKey].length > 0) {
+      this.numFreeTextures--;
+      this.numUsedTextures++;
+      this.log();
+      return this.freeTextures[shapeKey].shift();
+    }
+    this.numUsedTextures++;
+    this.log();
+
+    const newTexture = this.gpgpu.createTempMatrixTexture(
+        shapeRC[0], shapeRC[1]);
+    this.allocatedTextures.push(newTexture);
+    return newTexture;
+  }
+
   releaseTexture(
       texture: WebGLTexture, shape: [number, number],
       logicalTexType: TextureUsage, isPacked: boolean): void {

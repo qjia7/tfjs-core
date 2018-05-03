@@ -144,6 +144,34 @@ function createAndConfigureTexture(
   return texture;
 }
 
+function createAndConfigureTempTexture(
+    gl: WebGLRenderingContext, width: number, height: number,
+    internalFormat: number, textureFormat: number,
+    textureType: number): WebGLTexture {
+webgl_util.validateTextureSize(gl, width, height);
+const texture = webgl_util.createTexture(gl);
+
+const tex2d = gl.TEXTURE_2D;
+const format = getTextureFormat(gl, numChannels);
+webgl_util.callAndCheck(gl, () => gl.bindTexture(tex2d, texture));
+webgl_util.callAndCheck(
+    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
+webgl_util.callAndCheck(
+    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE));
+webgl_util.callAndCheck(
+    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MIN_FILTER, gl.NEAREST));
+webgl_util.callAndCheck(
+    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
+webgl_util.callAndCheck(
+    gl,
+    () => gl.texImage2D(
+        tex2d, 0, internalFormat, width, height, 0, format,
+        getTextureType(gl), null));
+
+webgl_util.callAndCheck(gl, () => gl.bindTexture(gl.TEXTURE_2D, null));
+return texture;
+}
+
 export function createFloat32MatrixTexture(
     gl: WebGLRenderingContext, rows: number, columns: number,
     textureConfig: TextureConfig): WebGLTexture {
@@ -152,6 +180,14 @@ export function createFloat32MatrixTexture(
   return createAndConfigureTexture(
       gl, width, height, textureConfig.internalFormatFloat,
       textureConfig.textureFormatFloat, gl.FLOAT);
+}
+
+export function createTempMatrixTexture(
+  gl: WebGLRenderingContext, rows: number, columns: number): WebGLTexture {
+const [width, height] =
+    tex_util.getUnpackedMatrixTextureShapeWidthHeight(rows, columns);
+const numChannels = 1;
+return createAndConfigureTempTexture(gl, width, height, numChannels);
 }
 
 export function createFloat16MatrixTexture(
