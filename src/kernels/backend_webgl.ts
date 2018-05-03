@@ -250,7 +250,7 @@ export class MathBackendWebGL implements KernelBackend {
     // This is a byte texture with pixels.
     this.texData.get(tempPixelHandle.dataId).usage = TextureUsage.PIXELS;
     this.gpgpu.uploadPixelDataToTexture(
-        this.getTexture(tempPixelHandle.dataId), pixels as ImageData);
+        this.getTempTexture(tempPixelHandle.dataId), pixels as ImageData);
     const program = new FromPixelsProgram(outShape);
     const res = this.compileAndRun(program, [tempPixelHandle]);
 
@@ -563,6 +563,11 @@ export class MathBackendWebGL implements KernelBackend {
 
   getTexture(dataId: DataId): WebGLTexture {
     this.uploadToGPU(dataId);
+    return this.texData.get(dataId).texture;
+  }
+
+  getTempTexture(dataId: DataId): WebGLTexture {
+    this.uploadTempTextureToGPU(dataId);
     return this.texData.get(dataId).texture;
   }
 
@@ -2396,6 +2401,38 @@ export class MathBackendWebGL implements KernelBackend {
             newTexture, texShape[0], texShape[1],
             typedArrayToFloat32(values as Float32Array));
       }
+      // Once uploaded, don't store the values on cpu.
+      texData.values = null;
+      if (shouldTimeProgram) {
+        this.uploadWaitMs += performance.now() - start;
+      }
+    }
+  }
+
+  private uploadTempTextureToGPU(dataId: DataId): void {
+    this.throwIfNoData(dataId);
+    const texData = this.texData.get(dataId);
+    const {shape, values, texture, dtype, texType} = texData;
+    if (texture != null) {
+      // Array is already on GPU. No-op.
+      return;
+    }
+    const shouldTimeProgram = this.activeTimers != null;
+    let start: number;
+    if (shouldTimeProgram) {
+      start = performance.now();
+    }
+    const texShape =
+        webgl_util.getTextureShapeFromLogicalShape(this.gpgpu.gl, shape);
+    texData.texShape = texShape;
+    const newTexture = this.textureManager.acquireTempTexture(
+        texShape, texType);
+    texData.texture = newTexture;
+    if (values != null) {
+      this.gpgpu.uploadMatrixToTexture(
+          newTexture, texShape[0],
+          // TODO(smilkov): Propagate the original typed array to gpgpu.
+          texShape[1], typedArrayToFloat32(values, dtype));
       // Once uploaded, don't store the values on cpu.
       texData.values = null;
       if (shouldTimeProgram) {
