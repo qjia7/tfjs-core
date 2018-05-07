@@ -130,7 +130,7 @@ export class MathBackendWebGL implements KernelBackend {
     this.gpgpu.uploadPixelDataToTexture(
         this.getTempTexture(tempPixelArray.dataId), pixels);
     const program = new FromPixelsProgram(outShape);
-    const res = this.compileAndRun(program, [tempPixelArray]);
+    const res = this.compileAndRunCS(program, [tempPixelArray]);
 
     tempPixelArray.dispose();
 
@@ -320,7 +320,7 @@ export class MathBackendWebGL implements KernelBackend {
   slice<T extends Tensor>(x: T, begin: number[], size: number[]): T {
     const program = new SliceProgram(size);
     const customSetup = program.getCustomSetupFunc(begin);
-    return this.compileAndRun(program, [x], null, customSetup);
+    return this.compileAndRunCS(program, [x], null, customSetup);
   }
 
   reverse<T extends Tensor>(x: T, axis: number[]): T {
