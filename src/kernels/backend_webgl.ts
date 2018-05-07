@@ -374,7 +374,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = new BatchNormProgram(
         x.shape, mean.shape, variance.shape, offsetShape, scaleShape,
         varianceEpsilon);
-    return this.compileAndRun(program, inputs);
+    return this.compileAndRunCS(program, inputs);
   }
 
   localResponseNormalization4D(
@@ -397,7 +397,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   transpose<T extends Tensor>(x: T, perm: number[]): T {
     const program = new TransposeProgram(x.shape, perm);
-    return this.compileAndRun(program, [x]);
+    return this.compileAndRunCS(program, [x]);
   }
 
   gather<T extends Tensor>(x: T, indices: Tensor1D, axis: number): T {
@@ -414,7 +414,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = new ReduceProgram(reduceInfo, reduceType);
     const [rows, cols] = program.outputShape;
     const output = this.makeOutputArray<Tensor2D>([rows, cols], dtype);
-    this.compileAndRun(program, [x], output);
+    this.compileAndRunCS(program, [x], output);
     // No need to run another GPGPU program.
     if (output.shape[1] === 1) {
       return output;
@@ -562,7 +562,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   minimum(a: Tensor, b: Tensor): Tensor {
     const program = new BinaryOpProgram(binaryop_gpu.MIN, a.shape, b.shape);
-    return this.compileAndRun(program, [a, b]);
+    return this.compileAndRunCS(program, [a, b]);
   }
 
   mod(a: Tensor, b: Tensor): Tensor {
@@ -603,7 +603,7 @@ export class MathBackendWebGL implements KernelBackend {
 
     const program = new BinaryOpProgram(op, a.shape, b.shape);
     const output = this.makeOutputArray(program.outputShape, outputDtype);
-    return this.compileAndRun<Tensor, Tensor>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor, Tensor>(program, [a, b], output);
   }
 
   add(a: Tensor, b: Tensor): Tensor {
@@ -611,7 +611,7 @@ export class MathBackendWebGL implements KernelBackend {
     const output =
         this.makeOutputArray(
             program.outputShape, types.upcastType(a.dtype, b.dtype)) as Tensor;
-    return this.compileAndRun<Tensor, Tensor>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor, Tensor>(program, [a, b], output);
   }
 
   subtract(a: Tensor, b: Tensor): Tensor {
@@ -619,7 +619,7 @@ export class MathBackendWebGL implements KernelBackend {
     const output =
         this.makeOutputArray(
             program.outputShape, types.upcastType(a.dtype, b.dtype)) as Tensor;
-    return this.compileAndRun<Tensor, Tensor>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor, Tensor>(program, [a, b], output);
   }
 
   pow<T extends Tensor>(a: T, b: Tensor): T {
@@ -652,7 +652,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   exp<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.EXP);
-    return this.compileAndRun(program, [x]) as T;
+    return this.compileAndRunCS(program, [x]) as T;
   }
 
   expm1<T extends Tensor>(x: T): T {
@@ -662,7 +662,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   log<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.LOG);
-    return this.compileAndRun(program, [x]) as T;
+    return this.compileAndRunCS(program, [x]) as T;
   }
 
   log1p<T extends Tensor>(x: T): T {
@@ -692,7 +692,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   relu<T extends Tensor>(x: T): T {
     const program = new UnaryOpProgram(x.shape, unary_op.RELU);
-    return this.compileAndRun(program, [x]) as T;
+    return this.compileAndRunCS(program, [x]) as T;
   }
 
   elu<T extends Tensor>(x: T): T {
@@ -814,7 +814,7 @@ export class MathBackendWebGL implements KernelBackend {
 
   conv2d(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo): Tensor4D {
     const program = new Conv2DProgram(convInfo);
-    return this.compileAndRun(program, [x, filter]);
+    return this.compileAndRunCS(program, [x, filter]);
   }
 
   conv2dDerInput(dy: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
@@ -831,7 +831,7 @@ export class MathBackendWebGL implements KernelBackend {
   depthwiseConv2D(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
       Tensor4D {
     const program = new DepthwiseConv2DProgram(convInfo);
-    return this.compileAndRun(program, [x, filter]);
+    return this.compileAndRunCS(program, [x, filter]);
   }
 
   maxPool(x: Tensor4D, convInfo: Conv2DInfo): Tensor4D {
