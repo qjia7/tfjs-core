@@ -278,6 +278,7 @@ export class GPGPUContext {
   }
 
   private vertexAttrsAreBound = false;
+  private firstProgram = true;
 
   public createProgram(fragmentShaderSource: string): WebGLProgram {
     this.throwIfDisposed();
