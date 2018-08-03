@@ -33,7 +33,7 @@ export class FromPixelsProgram implements GPGPUProgram {
         int depth = coords[2];
         vec2 uv = (vec2(texC, texR) + halfCR) / vec2(${width}.0, ${height}.0);
 
-        vec4 values = texture(A, uv);
+        vec4 values = textureLod(A, uv, 0.0);
         float value;
         if (depth == 0) {
           value = values.r;

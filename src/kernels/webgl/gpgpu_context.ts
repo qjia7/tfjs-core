@@ -355,6 +355,10 @@ export class GPGPUContext {
     webgl_util.callAndCheck(
       // tslint:disable-next-line:no-any
       gl, () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));
+  // tslint:disable-next-line:no-any
+  (gl as any).memoryBarrier((gl as any).TEXTURE_UPDATE_BARRIER_BIT |
+                            // tslint:disable-next-line:no-any
+                            (gl as any).FRAMEBUFFER_BARRIER_BIT);
   }
 
   public blockUntilAllProgramsCompleted() {

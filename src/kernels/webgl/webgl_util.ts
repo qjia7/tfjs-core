@@ -35,7 +35,8 @@ export function createWebGLRenderingContextFromCanvas(
 
   const webglVersion = ENV.get('WEBGL_VERSION');
   if (webglVersion === 2) {
-    gl = canvas.getContext('webgl2', attributes) as WebGLRenderingContext;
+    // tslint:disable-next-line:max-line-length
+    gl = canvas.getContext('webgl2-compute', attributes) as WebGLRenderingContext;
   } else if (webglVersion === 1) {
     gl = (canvas.getContext('webgl', attributes) ||
           canvas.getContext('experimental-webgl', attributes)) as
@@ -338,11 +339,6 @@ export function bindColorTextureToFramebuffer(
 export function bindColorTextureToFramebufferCS(
     gl: WebGLRenderingContext, texture: WebGLTexture,
     framebuffer: WebGLFramebuffer) {
-  callAndCheck(gl, () => gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer));
-  callAndCheck(
-    gl,
-    () => gl.framebufferTexture2D(
-      gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0));
   callAndCheck(
       gl,
       // tslint:disable-next-line:no-any
