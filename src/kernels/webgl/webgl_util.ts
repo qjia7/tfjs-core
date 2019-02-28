@@ -18,35 +18,6 @@
 import {ENV} from '../../environment';
 import * as util from '../../util';
 
-export function createWebGLRenderingContext(attributes: WebGLContextAttributes):
-    WebGLRenderingContext {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1;
-  canvas.height = 1;
-  return createWebGLRenderingContextFromCanvas(canvas, attributes);
-}
-
-export function createWebGLRenderingContextFromCanvas(
-    canvas: HTMLCanvasElement,
-    attributes: WebGLContextAttributes): WebGLRenderingContext {
-  let gl: WebGLRenderingContext;
-
-  const webglVersion = ENV.get('WEBGL_VERSION');
-  if (webglVersion === 2) {
-    // tslint:disable-next-line:max-line-length
-    gl = canvas.getContext('webgl2-compute', attributes) as WebGLRenderingContext;
-  } else if (webglVersion === 1) {
-    gl = (canvas.getContext('webgl', attributes) ||
-          canvas.getContext('experimental-webgl', attributes)) as
-        WebGLRenderingContext;
-  }
-
-  if (webglVersion === 0 || gl == null) {
-    throw new Error('This browser does not support WebGL.');
-  }
-  return gl;
-}
-
 export function callAndCheck<T>(gl: WebGLRenderingContext, func: () => T): T {
   const returnValue = func();
   checkWebGLError(gl);
@@ -139,19 +110,19 @@ export function createFragmentShader(
 }
 
 export function createComputeShader(
-  gl: WebGLRenderingContext, computeShaderSource: string): WebGLShader {
-const computeShader: WebGLShader = throwIfNull<WebGLShader>(
-    // tslint:disable-next-line:no-any
-    gl, () => gl.createShader((gl as any).COMPUTE_SHADER),
-    'Unable to create compute WebGLShader.');
-callAndCheck(gl, () => gl.shaderSource(computeShader, computeShaderSource));
-callAndCheck(gl, () => gl.compileShader(computeShader));
-if (gl.getShaderParameter(computeShader, gl.COMPILE_STATUS) === false) {
-  logShaderSourceAndInfoLog(
-    computeShaderSource, gl.getShaderInfoLog(computeShader));
-  throw new Error('Failed to compile compute shader.');
-}
-return computeShader;
+    gl: WebGLRenderingContext, computeShaderSource: string): WebGLShader {
+  const computeShader: WebGLShader = throwIfNull<WebGLShader>(
+      // tslint:disable-next-line:no-any
+      gl, () => gl.createShader((gl as any).COMPUTE_SHADER),
+      'Unable to create compute WebGLShader.');
+  callAndCheck(gl, () => gl.shaderSource(computeShader, computeShaderSource));
+  callAndCheck(gl, () => gl.compileShader(computeShader));
+  if (gl.getShaderParameter(computeShader, gl.COMPILE_STATUS) === false) {
+    logShaderSourceAndInfoLog(
+        computeShaderSource, gl.getShaderInfoLog(computeShader));
+    throw new Error('Failed to compile compute shader.');
+  }
+  return computeShader;
 }
 
 const lineNumberRegex = /ERROR: [0-9]+:([0-9]+):/g;
@@ -338,7 +309,8 @@ export function bindColorTextureToFramebufferCS(
   callAndCheck(
       gl,
       // tslint:disable-next-line:no-any
-      () => (gl as any).bindImageTexture(4, texture, 0, (gl as any).FALSE,
+      () => (gl as any).bindImageTexture(
+          4, texture, 0, (gl as any).FALSE,
           // tslint:disable-next-line:no-any
           0, (gl as any).WRITE_ONLY, (gl as any).R32F));
 }

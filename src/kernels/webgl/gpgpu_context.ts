@@ -135,11 +135,6 @@ export class GPGPUContext {
         this.gl, rows, columns, this.textureConfig);
   }
 
-  public createTempMatrixTexture(rows: number, columns: number): WebGLTexture {
-    this.throwIfDisposed();
-    return gpgpu_util.createTempMatrixTexture(this.gl, rows, columns);
-  }
-
   public uploadPixelDataToTexture(
       texture: WebGLTexture,
       pixels: ImageData|HTMLImageElement|HTMLCanvasElement) {
@@ -435,12 +430,13 @@ export class GPGPUContext {
     const numGroupX = (columns + localSizeX - 1) / localSizeX;
     const numGroupY = (rows + localSizeY - 1) / localSizeY;
     webgl_util.callAndCheck(
-      // tslint:disable-next-line:no-any
-      gl, () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));
-  // tslint:disable-next-line:no-any
-  (gl as any).memoryBarrier((gl as any).TEXTURE_UPDATE_BARRIER_BIT |
-                            // tslint:disable-next-line:no-any
-                            (gl as any).FRAMEBUFFER_BARRIER_BIT);
+        // tslint:disable-next-line:no-any
+        gl, () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));
+    // tslint:disable-next-line:no-any
+    (gl as any).memoryBarrier(
+        (gl as any).TEXTURE_UPDATE_BARRIER_BIT |
+        // tslint:disable-next-line:no-any
+        (gl as any).FRAMEBUFFER_BARRIER_BIT);
   }
 
   public blockUntilAllProgramsCompleted() {

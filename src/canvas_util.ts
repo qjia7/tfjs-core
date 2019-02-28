@@ -70,5 +70,6 @@ function getWebGLRenderingContext(webGLVersion: number): WebGLRenderingContext {
             canvas.getContext('experimental-webgl', WEBGL_ATTRIBUTES)) as
         WebGLRenderingContext;
   }
-  return canvas.getContext('webgl2', WEBGL_ATTRIBUTES) as WebGLRenderingContext;
+  return canvas.getContext('webgl2-compute', WEBGL_ATTRIBUTES) as
+      WebGLRenderingContext;
 }
