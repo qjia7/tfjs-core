@@ -144,32 +144,31 @@ function createAndConfigureTexture(
   return texture;
 }
 
-function createAndConfigureTempTexture(
+function createAndConfigureUnsignedBytesTexture(
     gl: WebGLRenderingContext, width: number, height: number,
     internalFormat: number, textureFormat: number,
     textureType: number): WebGLTexture {
-webgl_util.validateTextureSize(gl, width, height);
-const texture = webgl_util.createTexture(gl);
+  webgl_util.validateTextureSize(width, height);
+  const texture = webgl_util.createTexture(gl);
 
-const tex2d = gl.TEXTURE_2D;
-const format = getTextureFormat(gl, numChannels);
-webgl_util.callAndCheck(gl, () => gl.bindTexture(tex2d, texture));
-webgl_util.callAndCheck(
-    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
-webgl_util.callAndCheck(
-    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE));
-webgl_util.callAndCheck(
-    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MIN_FILTER, gl.NEAREST));
-webgl_util.callAndCheck(
-    gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
-webgl_util.callAndCheck(
-    gl,
-    () => gl.texImage2D(
-        tex2d, 0, internalFormat, width, height, 0, format,
-        getTextureType(gl), null));
+  const tex2d = gl.TEXTURE_2D;
+  webgl_util.callAndCheck(gl, () => gl.bindTexture(tex2d, texture));
+  webgl_util.callAndCheck(
+      gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE));
+  webgl_util.callAndCheck(
+      gl, () => gl.texParameteri(tex2d, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE));
+  webgl_util.callAndCheck(
+      gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MIN_FILTER, gl.NEAREST));
+  webgl_util.callAndCheck(
+      gl, () => gl.texParameteri(tex2d, gl.TEXTURE_MAG_FILTER, gl.NEAREST));
+  webgl_util.callAndCheck(
+      gl,
+      () => gl.texImage2D(
+          tex2d, 0, internalFormat, width, height, 0, textureFormat,
+          textureType, null));
 
-webgl_util.callAndCheck(gl, () => gl.bindTexture(gl.TEXTURE_2D, null));
-return texture;
+  webgl_util.callAndCheck(gl, () => gl.bindTexture(gl.TEXTURE_2D, null));
+  return texture;
 }
 
 export function createFloat32MatrixTexture(
@@ -180,14 +179,6 @@ export function createFloat32MatrixTexture(
   return createAndConfigureTexture(
       gl, width, height, textureConfig.internalFormatFloat,
       textureConfig.textureFormatFloat, gl.FLOAT);
-}
-
-export function createTempMatrixTexture(
-  gl: WebGLRenderingContext, rows: number, columns: number): WebGLTexture {
-const [width, height] =
-    tex_util.getUnpackedMatrixTextureShapeWidthHeight(rows, columns);
-const numChannels = 1;
-return createAndConfigureTempTexture(gl, width, height, numChannels);
 }
 
 export function createFloat16MatrixTexture(
@@ -205,7 +196,7 @@ export function createUnsignedBytesMatrixTexture(
     textureConfig: TextureConfig): WebGLTexture {
   const [width, height] =
       tex_util.getUnpackedMatrixTextureShapeWidthHeight(rows, columns);
-  return createAndConfigureTexture(
+  return createAndConfigureUnsignedBytesTexture(
       gl, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE);
 }
 

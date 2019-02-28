@@ -105,38 +105,44 @@ export function compileProgram<T extends Tensor, K extends Tensor>(
 }
 
 export function compileCSProgram<T extends Tensor, K extends Tensor>(
-    gpgpu: GPGPUContext, program: GPGPUProgram, inputs: Array<TensorData<T>>,
-    output: TensorData<K>): GPGPUBinary {
+    gpgpu: GPGPUContext, program: GPGPUProgram, inputs: TensorData[],
+    output: TensorData): GPGPUBinary {
   const userCode = program.userCode;
-  const inputInfos = inputs.map((input, i) => {
-    const shapeInfo = {
-      logicalShape: input.tensor.shape,
-      texShape: input.texData.texShape
+  const inputInfos: InputInfo[] = inputs.map((input, i) => {
+    const shapeInfo: ShapeInfo = {
+      logicalShape: input.shape,
+      texShape: input.isUniform ? null : input.texData.texShape,
+      isUniform: input.isUniform,
+      isPacked: input.isUniform ? false : input.texData.isPacked,
+      flatOffset: null
     };
-    return { name: program.variableNames[i], shapeInfo };
+    if (input.texData != null && input.texData.slice != null &&
+        input.texData.slice.flatOffset > 0) {
+      shapeInfo.flatOffset = input.texData.slice.flatOffset;
+    }
+    return {name: program.variableNames[i], shapeInfo};
   });
   const inShapeInfos = inputInfos.map(x => x.shapeInfo);
-  const outShapeInfo = {
-    logicalShape: output.tensor.shape,
-    texShape: output.texData.texShape
+  const outShapeInfo: ShapeInfo = {
+    logicalShape: output.shape,
+    texShape: output.texData.texShape,
+    isUniform: false,
+    isPacked: output.texData.isPacked,
+    flatOffset: null
   };
   const source = shader_compiler.makeCSShader(
-      inputInfos, outShapeInfo, userCode,
-      program.supportsBroadcasting === true);
+      inputInfos, outShapeInfo, userCode, program.usesPackedTextures);
 
   const webGLProgram = gpgpu.createCSProgram(source);
 
-  const uniformLocations: { [name: string]: WebGLUniformLocation } = {};
+  const uniformLocations: {[name: string]: WebGLUniformLocation} = {};
   for (let i = 0; i < program.variableNames.length; i++) {
-    const uniformName = program.variableNames[i];
-    uniformLocations[uniformName] =
-        gpgpu.getUniformLocation(webGLProgram, uniformName);
-  }
-
-  if (shouldUploadNaNUniform()) {
-    const throwIfNaNUniformIsNotUsed = false;
-    uniformLocations[NAN_UNIFORM_NAME] = gpgpu.getUniformLocation(
-        webGLProgram, NAN_UNIFORM_NAME, throwIfNaNUniformIsNotUsed);
+    const varName = program.variableNames[i];
+    const shouldThrow = false;
+    uniformLocations[varName] =
+        gpgpu.getUniformLocation(webGLProgram, varName, shouldThrow);
+    uniformLocations[`offset${varName}`] =
+        gpgpu.getUniformLocation(webGLProgram, `offset${varName}`, shouldThrow);
   }
 
   return {
@@ -238,7 +244,7 @@ export function runProgram<T extends Tensor, K extends Tensor>(
 }
 
 export function runCSProgram<T extends Tensor, K extends Tensor>(
-    binary: GPGPUBinary, inputs: Array<TensorData<T>>, output: TensorData<K>,
+    binary: GPGPUBinary, inputs: TensorData[], output: TensorData,
     customSetup?: (gpgpu: GPGPUContext, webGLProgram: WebGLProgram) =>
         void): void {
   validateBinaryAndProgram(binary.inShapeInfos, inputs);
@@ -247,18 +253,43 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
   const outTex = output.texData.texture;
   const outTexShape = output.texData.texShape;
   const gpgpu = binary.gpgpu;
-  gpgpu.setOutputMatrixTextureCS(outTex, outTexShape[0], outTexShape[1]);
+  if (output.texData.isPacked) {
+    gpgpu.setOutputPackedMatrixTexture(outTex, outTexShape[0], outTexShape[1]);
+  } else {
+    gpgpu.setOutputMatrixTextureCS(outTex, outTexShape[0], outTexShape[1]);
+  }
   gpgpu.setProgram(binary.webGLProgram);
   inputs.forEach((input, i) => {
-    const tex = input.texData.texture;
-    const variableName = binary.program.variableNames[i];
-    const variableUniformLocation = binary.uniformLocations[variableName];
-    gpgpu.setInputMatrixTexture(tex, variableUniformLocation, i);
-  });
+    const varName = binary.program.variableNames[i];
+    const varLoc = binary.uniformLocations[varName];
+    const varOffsetLoc = binary.uniformLocations[`offset${varName}`];
 
-  if (shouldUploadNaNUniform()) {
-    gpgpu.gl.uniform1f(binary.uniformLocations[NAN_UNIFORM_NAME], NaN);
-  }
+    if (varLoc == null) {
+      // The compiler inferred that this variable is not used in this shader.
+      return;
+    }
+
+    if (input.isUniform) {
+      // Upload the values of the tensor as uniform.
+      if (util.sizeFromShape(input.shape) === 1) {
+        gpgpu.gl.uniform1f(varLoc, input.uniformValues[0]);
+      } else {
+        let vals = input.uniformValues;
+        if (!(vals instanceof Float32Array)) {
+          vals = new Float32Array(vals);
+        }
+        gpgpu.gl.uniform1fv(varLoc, vals);
+      }
+      return;
+    }
+
+    // If the input was sliced, upload the flat offset index.
+    if (input.texData.slice != null && varOffsetLoc != null) {
+      gpgpu.gl.uniform1i(varOffsetLoc, input.texData.slice.flatOffset);
+    }
+
+    gpgpu.setInputMatrixTexture(input.texData.texture, varLoc, i);
+  });
 
   if (customSetup != null) {
     customSetup(gpgpu, binary.webGLProgram);
