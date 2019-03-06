@@ -294,7 +294,8 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
   if (customSetup != null) {
     customSetup(gpgpu, binary.webGLProgram);
   }
-  gpgpu.executeCSProgram(outTexShape[0], outTexShape[1]);
+  gpgpu.executeCSProgram(
+      outTexShape[0], outTexShape[1], output.texData.isPacked);
 }
 
 export function makeShaderKey(

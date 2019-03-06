@@ -418,12 +418,16 @@ export class GPGPUContext {
         gl, () => gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0));
   }
 
-  public executeCSProgram(rows: number, columns: number) {
+  public executeCSProgram(rows: number, columns: number, isPacked = false) {
     this.throwIfDisposed();
     this.throwIfNoProgram();
     const gl = this.gl;
     if (this.autoDebugValidate) {
       this.debugValidate();
+    }
+    if (isPacked) {
+      columns = Math.max(1, Math.ceil(columns / 2));
+      rows = Math.max(1, Math.ceil(rows / 2));
     }
     const localSizeX = 32;
     const localSizeY = 32;
