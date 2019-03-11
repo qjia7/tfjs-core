@@ -303,9 +303,8 @@ export function bindColorTextureToFramebuffer(
           gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0));
 }
 
-export function bindColorTextureToFramebufferCS(
-    gl: WebGLRenderingContext, texture: WebGLTexture,
-    framebuffer: WebGLFramebuffer) {
+export function bindColorImageTexture(
+    gl: WebGLRenderingContext, texture: WebGLTexture) {
   callAndCheck(
       gl,
       // tslint:disable-next-line:no-any
@@ -313,6 +312,17 @@ export function bindColorTextureToFramebufferCS(
           4, texture, 0, (gl as any).FALSE,
           // tslint:disable-next-line:no-any
           0, (gl as any).WRITE_ONLY, (gl as any).R32F));
+}
+
+export function bindPackedImageTexture(
+    gl: WebGLRenderingContext, texture: WebGLTexture) {
+  callAndCheck(
+      gl,
+      // tslint:disable-next-line:no-any
+      () => (gl as any).bindImageTexture(
+          4, texture, 0, (gl as any).FALSE,
+          // tslint:disable-next-line:no-any
+          0, (gl as any).WRITE_ONLY, (gl as any).RGBA32F));
 }
 
 export function unbindColorTextureFromFramebuffer(
