@@ -196,7 +196,7 @@ function getPackedSamplerFromInInfo(inInfo: InputInfo): string {
       return getPackedSamplerND(inInfo);
   }
 }
-/*
+
 function getPackedSamplerFromInInfoCS(inInfo: InputInfo): string {
   const shape = inInfo.shapeInfo.logicalShape;
   switch (shape.length) {
@@ -212,13 +212,13 @@ function getPackedSamplerFromInInfoCS(inInfo: InputInfo): string {
       return getPackedSamplerNDCS(inInfo);
   }
 }
-*/
+
 function getInputSamplingSnippetCS(
     inInfo: InputInfo, outShapeInfo: ShapeInfo,
     usesPackedTextures = false): string {
   let res = '';
   if (usesPackedTextures) {
-    res += getPackedSamplerFromInInfo(inInfo);
+    res += getPackedSamplerFromInInfoCS(inInfo);
   } else {
     res += getSamplerFromInInfoCS(inInfo);
   }
@@ -510,7 +510,7 @@ vec2 packedUVfrom1D(int texNumR, int texNumC, int index) {
   return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);
 }
 `;
-/*
+
 const SAMPLE_1D_SNIPPET_CS = `
 ivec2 uvFromFlat(int texNumR, int texNumC, int index) {
   int texR = index / texNumC;
@@ -524,7 +524,7 @@ ivec2 packedUVfrom1D(int texNumR, int texNumC, int index) {
   return ivec2(texC, texR);
 }
 `;
-*/
+
 const SAMPLE_2D_SNIPPET = `
 vec2 packedUVfrom2D(int texelsInLogicalRow, int texNumR,
   int texNumC, int row, int col) {
@@ -534,7 +534,7 @@ vec2 packedUVfrom2D(int texelsInLogicalRow, int texNumR,
   return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);
 }
 `;
-/*
+
 const SAMPLE_2D_SNIPPET_CS = `
 ivec2 packedUVfrom2D(int texelsInLogicalRow, int texNumR,
   int texNumC, int row, int col) {
@@ -544,7 +544,7 @@ ivec2 packedUVfrom2D(int texelsInLogicalRow, int texNumR,
   return ivec2(texC, texR);
 }
 `;
-*/
+
 const SAMPLE_3D_SNIPPET = `
 vec2 packedUVfrom3D(int texNumR, int texNumC,
     int texelsInBatch, int texelsInLogicalRow, int b,
@@ -555,7 +555,7 @@ vec2 packedUVfrom3D(int texNumR, int texNumC,
   return (vec2(texC, texR) + halfCR) / vec2(texNumC, texNumR);
 }
 `;
-/*
+
 const SAMPLE_3D_SNIPPET_CS = `
 ivec2 packedUVfrom3D(int texNumR, int texNumC,
     int texelsInBatch, int texelsInLogicalRow, int b,
@@ -566,7 +566,7 @@ ivec2 packedUVfrom3D(int texNumR, int texNumC,
   return ivec2(texC, texR);
 }
 `;
-*/
+
 const SHADER_PACKED_PREFIX = `
   float getChannel(vec4 frag, vec2 innerDims) {
     vec2 modCoord = mod(innerDims, 2.);
@@ -668,9 +668,9 @@ function getShaderPrefixCS(glsl: GLSL, imageFormat: string): string {
     //https://www.shadertoy.com/view/4djSRW
     #define HASHSCALE1 443.8975
 
-    ${SAMPLE_1D_SNIPPET}
-    ${SAMPLE_2D_SNIPPET}
-    ${SAMPLE_3D_SNIPPET}
+    ${SAMPLE_1D_SNIPPET_CS}
+    ${SAMPLE_2D_SNIPPET_CS}
+    ${SAMPLE_3D_SNIPPET_CS}
   `;
 
   return SHADER_PREFIX;
@@ -1201,7 +1201,7 @@ function getPackedSamplerScalar(inputInfo: InputInfo): string {
     }
   `;
 }
-/*
+
 function getPackedSamplerScalarCS(inputInfo: InputInfo): string {
   const texName = inputInfo.name;
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
@@ -1211,7 +1211,7 @@ function getPackedSamplerScalarCS(inputInfo: InputInfo): string {
     }
   `;
 }
-*/
+
 function getSamplerScalar(inputInfo: InputInfo): string {
   const texName = inputInfo.name;
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
@@ -1278,7 +1278,7 @@ function getPackedSampler1D(inputInfo: InputInfo): string {
     }
   `;
 }
-/*
+
 function getPackedSampler1DCS(inputInfo: InputInfo): string {
   const texName = inputInfo.name;
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
@@ -1294,7 +1294,7 @@ function getPackedSampler1DCS(inputInfo: InputInfo): string {
     }
   `;
 }
-*/
+
 function getSampler1D(inputInfo: InputInfo): string {
   const texName = inputInfo.name;
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
@@ -1424,7 +1424,7 @@ function getPackedSampler2D(inputInfo: InputInfo): string {
     }
   `;
 }
-/*
+
 function getPackedSampler2DCS(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const texName = inputInfo.name;
@@ -1433,30 +1433,29 @@ function getPackedSampler2DCS(inputInfo: InputInfo): string {
 
   const texNumR = texShape[0];
   const texNumC = texShape[1];
-  const packedTexShape =
-      [Math.ceil(texShape[0] / 2), Math.ceil(texShape[1] / 2)];
   if (texShape != null && util.arraysEqual(shape, texShape)) {
     return `
       vec4 ${funcName}(int row, int col) {
         vec2 uv = (vec2(col, row) + halfCR) / vec2(${texNumC}.0, ${texNumR}.0);
-        ivec2 uv1 = ivec2(uv) *
-           ivec2(${packedTexShape[1]}, ${packedTexShape[0]});
-        return texelFetch(${texName}, uv1, 0);
+
+        return texture(${texName}, uv);
       }
     `;
   }
 
-const valuesPerRow = Math.ceil(shape[1] / 2);
+  const packedTexShape =
+      [Math.ceil(texShape[0] / 2), Math.ceil(texShape[1] / 2)];
+  const valuesPerRow = Math.ceil(shape[1] / 2);
 
-return `
+  return `
     vec4 ${funcName}(int row, int col) {
       ivec2 uv = packedUVfrom2D(${valuesPerRow}, ${packedTexShape[0]}, ${
-    packedTexShape[1]}, row, col);
+      packedTexShape[1]}, row, col);
       return texelFetch(${texName}, uv, 0);
     }
   `;
 }
-*/
+
 function getSampler2D(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const texName = inputInfo.name;
@@ -1633,7 +1632,7 @@ function getPackedSampler3D(inputInfo: InputInfo): string {
     }
   `;
 }
-/*
+
 function getPackedSampler3DCS(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const texName = inputInfo.name;
@@ -1669,7 +1668,7 @@ function getPackedSampler3DCS(inputInfo: InputInfo): string {
     }
   `;
 }
-*/
+
 function getSampler3D(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const texName = inputInfo.name;
@@ -1826,7 +1825,7 @@ function getPackedSamplerND(inputInfo: InputInfo): string {
     }
   `;
 }
-/*
+
 function getPackedSamplerNDCS(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const rank = shape.length;
@@ -1835,6 +1834,7 @@ function getPackedSamplerNDCS(inputInfo: InputInfo): string {
   const texShape = inputInfo.shapeInfo.texShape;
   const packedTexShape =
       [Math.ceil(texShape[0] / 2), Math.ceil(texShape[1] / 2)];
+  const texNumR = packedTexShape[0];
   const texNumC = packedTexShape[1];
 
   const valuesPerRow = Math.ceil(shape[rank - 1] / 2);
@@ -1846,17 +1846,18 @@ function getPackedSamplerNDCS(inputInfo: InputInfo): string {
     texelsInBatch *= shape[rank - b - 1];
     index = `b${b} * ${texelsInBatch} + ` + index;
   }
+
   return `
     vec4 ${funcName}(${params}) {
       int index = ${index};
       int texR = index / ${texNumC};
       int texC = index - texR * ${texNumC};
-      ivec2 uv = ivec2(texC, texR);
-      return texelFetch(${texName}, uv, 0);
+      vec2 uv = (vec2(texC, texR) + halfCR) / vec2(${texNumC}, ${texNumR});
+      return texture(${texName}, uv);
     }
   `;
 }
-*/
+
 function getSampler4D(inputInfo: InputInfo): string {
   const shape = inputInfo.shapeInfo.logicalShape;
   const texName = inputInfo.name;
@@ -2355,15 +2356,36 @@ function getSamplerAtOutputCoordsCS(
     `;
   }
 
+  const type = getCoordsDataType(outRank);
+  const broadcastDims = getBroadcastDims(
+      inputInfo.shapeInfo.logicalShape, outShapeInfo.logicalShape);
+  const rankDiff = outRank - inRank;
+  let coordsSnippet: string;
+  const fields = ['x', 'y', 'z', 'w', 'u', 'v'];
+
+  if (inRank === 0) {
+    coordsSnippet = '';
+  } else if (outRank < 2 && broadcastDims.length >= 1) {
+    coordsSnippet = 'coords = 0;';
+  } else {
+    coordsSnippet =
+        broadcastDims.map(d => `coords.${fields[d + rankDiff]} = 0;`)
+            .join('\n');
+  }
+  let unpackedCoordsSnippet = '';
+  if (outRank < 2 && inRank > 0) {
+    unpackedCoordsSnippet = 'coords';
+  } else {
+    unpackedCoordsSnippet = inputInfo.shapeInfo.logicalShape
+                                .map((s, i) => `coords.${fields[i + rankDiff]}`)
+                                .join(', ');
+  }
+
   return `
     float ${funcName}() {
-      int index = int(gl_GlobalInvocationID.y) * ${outTexShape[1]} +
-                  int(gl_GlobalInvocationID.x);
-      int texR = index / ${inTexShape[1]};
-      int texC = index - texR * ${inTexShape[1]};
-      ivec2 uv = ivec2(texC, texR);
-
-      return sampleTexture(${texName}, uv);
+      ${type} coords = getOutputCoords();
+      ${coordsSnippet}
+      return get${texFuncSnippet}(${unpackedCoordsSnippet});
     }
   `;
 }
