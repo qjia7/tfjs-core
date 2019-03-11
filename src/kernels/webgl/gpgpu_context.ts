@@ -387,6 +387,15 @@ export class GPGPUContext {
     this.setOutputMatrixTextureDriver(outputPackedMatrixTexture, width, height);
   }
 
+  public setOutputPackedMatrixTextureCS(
+      outputPackedMatrixTexture: WebGLTexture, rows: number, columns: number) {
+    this.throwIfDisposed();
+    const [width, height] =
+        tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns);
+    this.setPackedOutputMatrixTextureDriverCS(
+        outputPackedMatrixTexture, width, height);
+  }
+
   public setOutputMatrixWriteRegion(
       startRow: number, numRows: number, startColumn: number,
       numColumns: number) {
@@ -425,10 +434,12 @@ export class GPGPUContext {
     if (this.autoDebugValidate) {
       this.debugValidate();
     }
+
     if (isPacked) {
-      columns = Math.max(1, Math.ceil(columns / 2));
-      rows = Math.max(1, Math.ceil(rows / 2));
+      columns = Math.ceil(columns / 2);
+      rows = Math.ceil(rows / 2);
     }
+
     const localSizeX = 32;
     const localSizeY = 32;
     const numGroupX = (columns + localSizeX - 1) / localSizeX;
@@ -441,6 +452,14 @@ export class GPGPUContext {
         (gl as any).TEXTURE_UPDATE_BARRIER_BIT |
         // tslint:disable-next-line:no-any
         (gl as any).FRAMEBUFFER_BARRIER_BIT);
+    /*
+        const size = 8 * 8 * 4;
+        const result = new Float32Array(size);
+        gl.readPixels(0, 0, 8, 8, gl.RGBA, gl.FLOAT, result);
+        for (let i = 0; i < size; i++) {
+          console.log('' + result[i]);
+        }
+        */
   }
 
   public blockUntilAllProgramsCompleted() {
@@ -643,11 +662,16 @@ export class GPGPUContext {
       height: number) {
     this.throwIfDisposed();
     const gl = this.gl;
-    webgl_util.bindColorTextureToFramebufferCS(
-        gl, outputMatrixTextureMaybePacked, this.framebuffer);
-    if (this.autoDebugValidate) {
-      webgl_util.validateFramebuffer(gl);
-    }
+    webgl_util.bindColorImageTexture(gl, outputMatrixTextureMaybePacked);
+    this.outputTexture = outputMatrixTextureMaybePacked;
+  }
+
+  private setPackedOutputMatrixTextureDriverCS(
+      outputMatrixTextureMaybePacked: WebGLTexture, width: number,
+      height: number) {
+    this.throwIfDisposed();
+    const gl = this.gl;
+    webgl_util.bindPackedImageTexture(gl, outputMatrixTextureMaybePacked);
     this.outputTexture = outputMatrixTextureMaybePacked;
   }
 

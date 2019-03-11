@@ -254,7 +254,8 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
   const outTexShape = output.texData.texShape;
   const gpgpu = binary.gpgpu;
   if (output.texData.isPacked) {
-    gpgpu.setOutputPackedMatrixTexture(outTex, outTexShape[0], outTexShape[1]);
+    gpgpu.setOutputPackedMatrixTextureCS(
+        outTex, outTexShape[0], outTexShape[1]);
   } else {
     gpgpu.setOutputMatrixTextureCS(outTex, outTexShape[0], outTexShape[1]);
   }

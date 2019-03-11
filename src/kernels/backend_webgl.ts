@@ -252,7 +252,7 @@ export class MathBackendWebGL implements KernelBackend {
     this.gpgpu.uploadPixelDataToTexture(
         this.getTexture(tempPixelHandle.dataId), pixels as ImageData);
     const program = new FromPixelsProgram(outShape);
-    const res = this.compileAndRunCS(program, [tempPixelHandle]);
+    const res = this.compileAndRun(program, [tempPixelHandle]);
 
     this.disposeData(tempPixelHandle.dataId);
 
@@ -785,7 +785,7 @@ export class MathBackendWebGL implements KernelBackend {
         a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
     const output =
         this.makePackedTensor(program.outputShape, dtype) as Tensor3D;
-    return this.compileAndRun<Tensor3D>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor3D>(program, [a, b], output);
   }
 
   fusedBatchMatMul(
