@@ -20,7 +20,7 @@ import {Profiler} from './profiler';
 import {backpropagateGradients, getFilteredNodesXToY, NamedGradientMap, TapeNode} from './tape';
 import {DataId, Tensor, Tensor3D, TensorTracker, Variable} from './tensor';
 import {NamedTensorMap, NamedVariableMap, TensorContainer} from './tensor_types';
-import {getTensorsInContainer, isTensorInList} from './tensor_util';
+import {getTensorsInContainer} from './tensor_util';
 import {DataType, DataValues} from './types';
 import * as util from './util';
 import {bytesFromStringArray, makeOnesTypedArray, now, sizeFromShape} from './util';
@@ -76,6 +76,7 @@ export interface TensorManager {
 interface ScopeState {
   track: Tensor[];
   name: string;
+  id: number;
 }
 
 export class Engine implements TensorManager, TensorTracker, DataMover {
@@ -98,7 +99,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
   // Keep Tensors that parallel the tapes.
   private activeScope: ScopeState;
   private scopeStack: ScopeState[] = [];
-  private keepTensors: Set<number> = new Set();
+  private nextScopeId = 0;
   private profiler: Profiler;
 
   private tensorInfo = new WeakMap<DataId, {
@@ -259,7 +260,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
       // string tensors are counted when writing values.
       let bytes = 0;
       if (a.dtype !== 'complex64' && a.dtype !== 'string') {
-        bytes = util.sizeFromShape(a.shape) * util.bytesPerElement(a.dtype);
+        bytes = a.size * util.bytesPerElement(a.dtype);
       }
       this.tensorInfo.set(a.dataId, {
         backend: backend != null ? backend : this.backend,
@@ -292,9 +293,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
     if (!this.tensorInfo.has(a.dataId)) {
       return;
     }
-    if (this.keepTensors.has(a.id)) {
-      this.keepTensors.delete(a.id);
-    }
+
     this.numTensors--;
     if (a.dtype === 'string') {
       this.numStringTensors--;
@@ -398,7 +397,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
           'Safe mode is ON. Enclose all tensor operations inside tf.tidy(): ' +
           'tf.tidy(() => {...}) to avoid memory leaks.');
     }
-    this.keepTensors.add(result.id);
+    result.kept = true;
     return result;
   }
 
@@ -414,7 +413,8 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
       this.gradientScopeCount++;
     }
 
-    const scopeInfo: ScopeState = {track: [], name: 'unnamed scope'};
+    const scopeInfo:
+        ScopeState = {track: [], name: 'unnamed scope', id: this.nextScopeId++};
     if (name) {
       scopeInfo.name = name;
     }
@@ -434,21 +434,17 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
       }
     }
 
-    const tensorsToKeep = new Set(this.keepTensors);
-
     const tensorsToTrackInParent = getTensorsInContainer(result);
-    tensorsToTrackInParent.forEach(tensor => tensorsToKeep.add(tensor.id));
+    const tensorsToTrackInParentSet =
+        new Set(tensorsToTrackInParent.map(t => t.id));
 
     // Dispose the arrays tracked in this scope.
     for (let i = 0; i < this.activeScope.track.length; i++) {
       const tensor = this.activeScope.track[i];
-      if (tensorsToKeep.has(tensor.id)) {
-        continue;
-      }
 
       if (this.activeTape != null) {
         tensorsToTrackInParent.push(tensor);
-      } else {
+      } else if (!tensor.kept && !tensorsToTrackInParentSet.has(tensor.id)) {
         tensor.dispose();
       }
     }
@@ -462,8 +458,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
     tensorsToTrackInParent.forEach(tensor => {
       // Only track the tensor if was allocated in the inner scope and is not
       // globally kept.
-      if (!this.keepTensors.has(tensor.id) &&
-          isTensorInList(tensor, oldScope.track)) {
+      if (!tensor.kept && tensor.scopeId === oldScope.id) {
         this.track(tensor);
       }
     });
@@ -478,7 +473,8 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
   gradients<T extends Tensor>(
       f: () => T, xs: Tensor[], dy?: T,
       allowNoGradients = false): {value: T, grads: Tensor[]} {
-    util.assert(xs.length > 0, 'gradients() received an empty list of xs.');
+    util.assert(
+        xs.length > 0, () => 'gradients() received an empty list of xs.');
     if (dy != null && dy.dtype !== 'float32') {
       throw new Error(`dy must have 'float32' dtype, but has '${dy.dtype}'`);
     }
@@ -487,7 +483,7 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
       const y = f();
       util.assert(
           y instanceof Tensor,
-          'The result y returned by f() must be a tensor.');
+          () => 'The result y returned by f() must be a tensor.');
       // Filter out the nodes that don't connect x => y.
       const filteredTape = getFilteredNodesXToY(this.activeTape, xs, y);
       if (!allowNoGradients && filteredTape.length === 0 && xs.length > 0) {
@@ -512,11 +508,12 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
       (...args: Tensor[]) => T {
     util.assert(
         util.isFunction(f),
-        'The f passed in customGrad(f) must be a function.');
+        () => 'The f passed in customGrad(f) must be a function.');
     return (...inputs: Tensor[]): T => {
       util.assert(
           inputs.every(t => t instanceof Tensor),
-          'The args passed in customGrad(f)(x1, x2,...) must all be tensors');
+          () => 'The args passed in customGrad(f)(x1, x2,...) must all be ' +
+              'tensors');
 
       let gradientsFunc: (dy: T) => Tensor | Tensor[];
       let result: T;
@@ -528,11 +525,13 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
               const {value, gradFunc} = f(...inputs);
               util.assert(
                   value instanceof Tensor,
-                  'The function f passed in customGrad(f) must return an ' +
+                  () =>
+                      'The function f passed in customGrad(f) must return an ' +
                       'object where `obj.value` is a tensor');
               util.assert(
                   util.isFunction(gradFunc),
-                  'The function f passed in customGrad(f) must return an ' +
+                  () =>
+                      'The function f passed in customGrad(f) must return an ' +
                       'object where `obj.gradFunc` is a function.');
               gradientsFunc = gradFunc;
               return value;
@@ -545,14 +544,14 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
           const grads: Tensor[] = Array.isArray(res) ? res : [res];
           util.assert(
               grads.length === inputs.length,
-              'The function f passed in customGrad(f) must return an object ' +
-                  'where `obj.gradFunc` is a function that returns the same ' +
-                  'number of tensors as inputs passed to f(...).');
+              () => 'The function f passed in customGrad(f) must return an ' +
+                  'object where `obj.gradFunc` is a function that returns ' +
+                  'the same number of tensors as inputs passed to f(...).');
           util.assert(
               grads.every(t => t instanceof Tensor),
-              'The function f passed in customGrad(f) must return an object ' +
-                  'where `obj.gradFunc` is a function that returns a list of ' +
-                  'only tensors.');
+              () => 'The function f passed in customGrad(f) must return an ' +
+                  'object where `obj.gradFunc` is a function that returns a ' +
+                  'list of only tensors.');
           return grads;
         };
         this.addTapeNode(inputs, result, gradFunc);
@@ -614,8 +613,10 @@ export class Engine implements TensorManager, TensorTracker, DataMover {
           'tf.tidy(() => {op();...}); to avoid memory leaks.');
     }
     if (this.activeScope != null) {
+      result.scopeId = this.activeScope.id;
       this.activeScope.track.push(result);
     }
+
     return result;
   }
 }
