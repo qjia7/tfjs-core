@@ -1462,12 +1462,14 @@ function getPackedSampler2DCS(inputInfo: InputInfo): string {
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
   const texShape = inputInfo.shapeInfo.texShape;
 
+  const texNumR = texShape[0];
+  const texNumC = texShape[1];
   if (texShape != null && util.arraysEqual(shape, texShape)) {
     return `
       vec4 ${funcName}(int row, int col) {
-        ivec2 uv = ivec2(col, row);
+        vec2 uv = (vec2(col, row) + halfCR) / vec2(${texNumC}.0, ${texNumR}.0);
 
-        return texelFetch(${texName}, uv, 0);
+        return texture(${texName}, uv);
       }
     `;
   }
