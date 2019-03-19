@@ -22,6 +22,7 @@ export class BatchNormProgram implements GPGPUProgram {
   variableNames: string[];
   outputShape: number[] = [];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(
       xShape: number[], meanShape: number[], varianceShape: number[],

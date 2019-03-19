@@ -427,7 +427,7 @@ export class GPGPUContext {
         gl, () => gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0));
   }
 
-  public executeCSProgram(rows: number, columns: number, isPacked = false) {
+  public executeCSProgram(numGroupX: number, numGroupY: number) {
     this.throwIfDisposed();
     this.throwIfNoProgram();
     const gl = this.gl;
@@ -435,15 +435,6 @@ export class GPGPUContext {
       this.debugValidate();
     }
 
-    if (isPacked) {
-      columns = Math.ceil(columns / 2);
-      rows = Math.ceil(rows / 2);
-    }
-
-    const localSizeX = 32;
-    const localSizeY = 32;
-    const numGroupX = (columns + localSizeX - 1) / localSizeX;
-    const numGroupY = (rows + localSizeY - 1) / localSizeY;
     webgl_util.callAndCheck(
         // tslint:disable-next-line:no-any
         gl, () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));

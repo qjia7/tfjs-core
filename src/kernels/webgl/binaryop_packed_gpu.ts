@@ -150,6 +150,7 @@ export class BinaryOpPackedProgram implements GPGPUProgram {
   userCode: string;
   supportsBroadcasting = true;
   usesPackedTextures = true;
+  localGroupSize = [32, 32];
 
   // Caching uniform location for speed.
   startLoc: WebGLUniformLocation;

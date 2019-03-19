@@ -25,6 +25,7 @@ export class PackProgram implements GPGPUProgram {
   isPackShader = true;
   outputShape: number[];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(
       outputShape:

@@ -22,6 +22,7 @@ export class ReduceProgram implements GPGPUProgram {
   variableNames = ['x'];
   outputShape: number[];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(
       reduceInfo: ReduceInfo,

@@ -47,6 +47,7 @@ export class UnaryOpPackedProgram implements GPGPUProgram {
   userCode: string;
   outputShape: number[];
   usesPackedTextures = true;
+  localGroupSize = [32, 32];
 
   // Caching uniform location for speed.
   startLoc: WebGLUniformLocation;

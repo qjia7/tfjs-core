@@ -15,9 +15,10 @@
  * =============================================================================
  */
 
+import {getVecChannels} from '../packing_util';
+
 import {GPGPUProgram} from './gpgpu_math';
 import {getCoordsDataType} from './shader_compiler';
-import { getVecChannels } from '../packing_util';
 
 export class TransposePackedProgram implements GPGPUProgram {
   variableNames = ['A'];
@@ -25,6 +26,7 @@ export class TransposePackedProgram implements GPGPUProgram {
   userCode: string;
   rank: number;
   usesPackedTextures = true;
+  localGroupSize = [32, 32];
 
   constructor(aShape: number[], newDim: number[]) {
     const outputShape: number[] = new Array(aShape.length);
@@ -63,7 +65,7 @@ export class TransposePackedProgram implements GPGPUProgram {
         if(${nextColumn}) {
           result[3] = ${getc};
         }
-      }  
+      }
       setOutput(result);
     }
     `;

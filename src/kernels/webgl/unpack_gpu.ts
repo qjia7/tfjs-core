@@ -25,6 +25,7 @@ export class UnpackProgram implements GPGPUProgram {
   usesPackedTextures = true;
   outputShape: number[];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(outputShape: number[]) {
     this.outputShape = outputShape;

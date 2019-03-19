@@ -86,7 +86,7 @@ export function makeShader(
 
 export function makeCSShader(
     inputsInfo: InputInfo[], outputShape: ShapeInfo, userCode: string,
-    usesPackedTextures: boolean): string {
+    localGroupSize: number[], usesPackedTextures: boolean): string {
   const prefixSnippets: string[] = [];
   inputsInfo.forEach(x => {
     const size = util.sizeFromShape(x.shapeInfo.logicalShape);
@@ -115,12 +115,12 @@ export function makeCSShader(
   let shaderPrefix: string;
 
   if (outputShape.isPacked) {
-    shaderPrefix = getShaderPrefixCS(glsl, 'rgba32f');
+    shaderPrefix = getShaderPrefixCS(glsl, 'rgba32f', localGroupSize);
     outputSamplingSnippet =
         getPackedOutputSamplingSnippetCS(outputShape.logicalShape, outTexShape);
     floatTextureSetOutputSnippet = getFloatTextureSetRGBASnippetCS(glsl);
   } else {
-    shaderPrefix = getShaderPrefixCS(glsl, 'r32f');
+    shaderPrefix = getShaderPrefixCS(glsl, 'r32f', localGroupSize);
     outputSamplingSnippet =
         getOutputSamplingSnippetCS(outputShape.logicalShape, outTexShape);
     floatTextureSetOutputSnippet = getFloatTextureSetRSnippetCS(glsl);
@@ -580,7 +580,8 @@ const SHADER_PACKED_PREFIX = `
   }
 `;
 
-function getShaderPrefixCS(glsl: GLSL, imageFormat: string): string {
+function getShaderPrefixCS(
+    glsl: GLSL, imageFormat: string, localGroupSize: number[]): string {
   let nanChecks = '';
   if (ENV.get('PROD')) {
     nanChecks = `
@@ -623,8 +624,8 @@ function getShaderPrefixCS(glsl: GLSL, imageFormat: string): string {
   }
 
   const SHADER_PREFIX = `#version 310 es
-    #define TILE_WIDTH 32
-    #define TILE_HEIGHT 32
+    #define TILE_WIDTH ${localGroupSize[0]}
+    #define TILE_HEIGHT ${localGroupSize[1]}
     precision highp float;
     precision highp int;
     layout(local_size_x=TILE_WIDTH, local_size_y=TILE_HEIGHT) in;
@@ -1027,8 +1028,8 @@ function getOutputPacked2DCoords(
    * getOutputCoords
    *
    * resTexRC: The rows and columns of the texels. If you move over one
-   * texel to the right in the packed texture, you are moving over one column
-   * (not two).
+   * texel to the right in the packed texture, you are moving over one
+   * column (not two).
    *
    * index: The texel index
    */
@@ -1065,8 +1066,8 @@ function getOutputPacked2DCoordsCS(
    * getOutputCoords
    *
    * resTexRC: The rows and columns of the texels. If you move over one
-   * texel to the right in the packed texture, you are moving over one column
-   * (not two).
+   * texel to the right in the packed texture, you are moving over one
+   * column (not two).
    *
    * index: The texel index
    */

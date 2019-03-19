@@ -25,6 +25,7 @@ export class UnaryOpProgram implements GPGPUProgram {
   variableNames = ['A'];
   userCode: string;
   outputShape: number[];
+  localGroupSize = [32, 32];
 
   // Caching uniform location for speed.
   startLoc: WebGLUniformLocation;

@@ -32,6 +32,7 @@ export interface GPGPUProgram {
   isPackShader?: boolean;  // This property is used to single out the packing
                            // shader so its output does not get eagerly unpacked
                            // by backend_webgl.compileAndRun.
+  localGroupSize?: number[];
 }
 
 export interface GPGPUBinary {
@@ -130,8 +131,10 @@ export function compileCSProgram<T extends Tensor, K extends Tensor>(
     isPacked: output.texData.isPacked,
     flatOffset: null
   };
+  const localGroupSize = program.localGroupSize;
   const source = shader_compiler.makeCSShader(
-      inputInfos, outShapeInfo, userCode, program.usesPackedTextures);
+      inputInfos, outShapeInfo, userCode, localGroupSize,
+      program.usesPackedTextures);
 
   const webGLProgram = gpgpu.createCSProgram(source);
 
@@ -295,8 +298,18 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
   if (customSetup != null) {
     customSetup(gpgpu, binary.webGLProgram);
   }
-  gpgpu.executeCSProgram(
-      outTexShape[0], outTexShape[1], output.texData.isPacked);
+
+  let rows = outTexShape[0];
+  let columns = outTexShape[1];
+
+  if (output.texData.isPacked) {
+    columns = Math.ceil(columns / 2);
+    rows = Math.ceil(rows / 2);
+  }
+  const localSize = binary.program.localGroupSize;
+  const numGroupX = (columns + localSize[0] - 1) / localSize[0];
+  const numGroupY = (rows + localSize[1] - 1) / localSize[1];
+  gpgpu.executeCSProgram(numGroupX, numGroupY);
 }
 
 export function makeShaderKey(

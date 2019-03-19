@@ -23,6 +23,7 @@ export class TransposeProgram implements GPGPUProgram {
   outputShape: number[];
   userCode: string;
   rank: number;
+  localGroupSize = [32, 32];
 
   constructor(aShape: number[], newDim: number[]) {
     const outputShape: number[] = new Array(aShape.length);

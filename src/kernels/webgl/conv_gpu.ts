@@ -22,6 +22,7 @@ export class Conv2DProgram implements GPGPUProgram {
   variableNames = ['x', 'W'];
   outputShape: number[];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(convInfo: Conv2DInfo) {
     this.outputShape = convInfo.outShape;

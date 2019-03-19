@@ -22,6 +22,7 @@ export class FromPixelsProgram implements GPGPUProgram {
   variableNames = ['A'];
   userCode: string;
   outputShape: number[];
+  localGroupSize = [32, 32];
 
   constructor(outputShape: number[]) {
     const glsl = getGlslDifferences();

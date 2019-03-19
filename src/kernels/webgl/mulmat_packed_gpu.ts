@@ -22,11 +22,12 @@ export class MatMulPackedProgram implements GPGPUProgram {
   usesPackedTextures = true;
   outputShape: number[];
   userCode: string;
+  localGroupSize = [32, 32];
 
   constructor(
       aShape: [number, number, number], outputShape: [number, number, number],
-      transposeA = false, transposeB = false,
-      addBias = false, activation: string = null) {
+      transposeA = false, transposeB = false, addBias = false,
+      activation: string = null) {
     this.outputShape = outputShape;
 
     const sharedDim = transposeA ? aShape[1] : aShape[2];
