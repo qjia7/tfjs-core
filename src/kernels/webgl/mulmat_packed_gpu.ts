@@ -22,7 +22,7 @@ export class MatMulPackedProgram implements GPGPUProgram {
   usesPackedTextures = true;
   outputShape: number[];
   userCode: string;
-  localGroupSize = [32, 32];
+  localGroupSize: number[];
 
   constructor(
       aShape: [number, number, number], outputShape: [number, number, number],
@@ -33,8 +33,8 @@ export class MatMulPackedProgram implements GPGPUProgram {
     const sharedDim = transposeA ? aShape[1] : aShape[2];
     const sharedDimensionPacked = Math.ceil(sharedDim / 2);
 
-    const aSample = transposeA ? 'i * 2, rc.y' : 'rc.y, i * 2';
-    const bSample = transposeB ? 'rc.z, i * 2' : 'i * 2, rc.z';
+    const aSample = transposeA ? 'tileCol * 2, rc.y' : 'rc.y, tileCol * 2';
+    const bSample = transposeB ? 'rc.z, tileRow * 2' : 'tileRow * 2, rc.z';
     const aSwizzle = transposeA ? ['a.xxyy', 'a.zzww'] : ['a.xxzz', 'a.yyww'];
     const bSwizzle = transposeB ? ['b.xzxz', 'b.ywyw'] : ['b.xyxy', 'b.zwzw'];
 
@@ -51,28 +51,45 @@ export class MatMulPackedProgram implements GPGPUProgram {
     if (addBias) {
       this.variableNames.push('bias');
     }
-
+    this.localGroupSize = [32, 32];
+    const TS = 32;
     this.userCode = `
       ${activationSnippet}
 
       const float sharedDimension = ${sharedDimensionPacked}.0;
-
-      vec4 dot2x2ARowBCol(ivec3 rc) {
-        vec4 result = vec4(0);
-        for (int i = 0; i < ${sharedDimensionPacked}; i++) {
-          vec4 a = getMatrixA(rc.x, ${aSample});
-          vec4 b = getMatrixB(rc.x, ${bSample});
-
-          result += (${aSwizzle[0]} * ${bSwizzle[0]}) + (${aSwizzle[1]} * ${
-        bSwizzle[1]});
-        }
-        return result;
-      }
-
+      shared vec4 Asub[${TS}][${TS}];
+      shared vec4 Bsub[${TS}][${TS}];
       void main() {
         ivec3 rc = getOutputCoords();
-        vec4 result = dot2x2ARowBCol(rc);
+        int row = int(gl_LocalInvocationID.y);
+        int col = int(gl_LocalInvocationID.x);
 
+        // Loop over all tiles
+        int numTiles = ${Math.ceil(sharedDimensionPacked / TS)};
+        vec4 result = vec4(0);
+        for (int t = 0; t < numTiles; t++) {
+          // Load one tile of A and B into local memory
+          int tileRow = ${TS} * t + row;
+          int tileCol = ${TS} * t + col;
+          Asub[row][col] = getMatrixA(rc.x, ${aSample});
+          Bsub[row][col] = getMatrixB(rc.x, ${bSample});
+
+          memoryBarrierShared();
+          barrier();
+
+          // If the tile size is larger than the shared dimension, we should
+          // limit the size to |sharedDimensionPacked|.
+          int sizeTS = numTiles == 1 ? ${sharedDimensionPacked} : ${TS};
+          for (int i = 0; i < sizeTS; i++) {
+            vec4 a = Asub[row][i];
+            vec4 b = Bsub[i][col];
+            result += (${aSwizzle[0]} * ${bSwizzle[0]}) + (${aSwizzle[1]} * ${
+        bSwizzle[1]});
+          }
+
+          // Synchronize before loading the next tile.
+          barrier();
+        }
         ${addBiasSnippet}
 
         ${applyActivationSnippet}
