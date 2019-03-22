@@ -624,8 +624,8 @@ function getShaderPrefixCS(
   }
 
   const SHADER_PREFIX = `#version 310 es
-    #define TILE_WIDTH ${localGroupSize[0]}
-    #define TILE_HEIGHT ${localGroupSize[1]}
+    #define TILE_WIDTH ${localGroupSize === undefined ? 32 : localGroupSize[0]}
+    #define TILE_HEIGHT ${localGroupSize === undefined ? 32 : localGroupSize[1]}
     precision highp float;
     precision highp int;
     layout(local_size_x=TILE_WIDTH, local_size_y=TILE_HEIGHT) in;
