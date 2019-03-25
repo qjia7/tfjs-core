@@ -869,7 +869,7 @@ export class MathBackendWebGL implements KernelBackend {
       const batchNormPackedProgram = new BatchNormPackedProgram(
           x.shape, mean.shape, variance.shape, offsetShape, scaleShape,
           varianceEpsilon);
-      return this.compileAndRun<Tensor4D>(batchNormPackedProgram, inputs);
+      return this.compileAndRunCS<Tensor4D>(batchNormPackedProgram, inputs);
     }
 
     const batchNormProgram = new BatchNormProgram(
@@ -1384,7 +1384,7 @@ export class MathBackendWebGL implements KernelBackend {
       a: TensorHandle, b: TensorHandle, op: string, dtype: DataType) {
     const program = new BinaryOpPackedProgram(op, a.shape, b.shape);
     const output = this.makePackedTensor(program.outputShape, dtype) as Tensor;
-    return this.compileAndRun<Tensor>(program, [a, b], output);
+    return this.compileAndRunCS<Tensor>(program, [a, b], output);
   }
 
   /**
@@ -1808,14 +1808,14 @@ export class MathBackendWebGL implements KernelBackend {
     const im2ColProgram =
         new Im2ColProgram(x2ColShape, xSqueezed.shape, convInfo);
     const im2Col =
-        this.compileAndRun<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
+        this.compileAndRunCS<Tensor2D>(im2ColProgram, [xSqueezed]).reshape([
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
     const matmulProgram = new MatMulPackedProgram(
         im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
     const product =
-        this.compileAndRun<Tensor4D>(matmulProgram, [im2Col, w2Row]);
+        this.compileAndRunCS<Tensor4D>(matmulProgram, [im2Col, w2Row]);
 
     return product.reshape([1, outHeight, outWidth, convInfo.outChannels]);
   }
@@ -1852,7 +1852,7 @@ export class MathBackendWebGL implements KernelBackend {
     if (ENV.get('WEBGL_PACK_DEPTHWISECONV') && convInfo.strideWidth <= 2 &&
         convInfo.outChannels / convInfo.inChannels === 1) {
       program = new DepthwiseConvPacked2DProgram(convInfo);
-      return this.compileAndRun(
+      return this.compileAndRunCS(
           program, [x, filter],
           this.makePackedTensor(convInfo.outShape, x.dtype));
     }
@@ -2211,7 +2211,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = new ReshapePackedProgram(
         afterShapeAs3D as [number, number, number],
         inputAs3D.shape as [number, number, number]);
-    return this.compileAndRun<Tensor<R>>(program, [inputAs3D])
+    return this.compileAndRunCS<Tensor<R>>(program, [inputAs3D])
         .reshape(afterShape);
   }
 

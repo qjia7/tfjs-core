@@ -74,7 +74,8 @@ export class Im2ColProgram implements GPGPUProgram {
           }
         }
 
-        ${glsl.output} = result;
+        imageStore(
+            ${glsl.output}, ivec2(gl_GlobalInvocationID.xy), result);
       }
     `;
   }
