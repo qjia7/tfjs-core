@@ -392,7 +392,7 @@ export class GPGPUContext {
     this.throwIfDisposed();
     const [width, height] =
         tex_util.getPackedMatrixTextureShapeWidthHeight(rows, columns);
-    this.setPackedOutputMatrixTextureDriverCS(
+    this.setOutputPackedMatrixTextureDriverCS(
         outputPackedMatrixTexture, width, height);
   }
 
@@ -649,21 +649,19 @@ export class GPGPUContext {
   }
 
   private setOutputMatrixTextureDriverCS(
-      outputMatrixTextureMaybePacked: WebGLTexture, width: number,
-      height: number) {
+      outputMatrixTexture: WebGLTexture, width: number, height: number) {
     this.throwIfDisposed();
     const gl = this.gl;
-    webgl_util.bindColorImageTexture(gl, outputMatrixTextureMaybePacked);
-    this.outputTexture = outputMatrixTextureMaybePacked;
+    webgl_util.bindColorImageTexture(gl, outputMatrixTexture);
+    this.outputTexture = outputMatrixTexture;
   }
 
-  private setPackedOutputMatrixTextureDriverCS(
-      outputMatrixTextureMaybePacked: WebGLTexture, width: number,
-      height: number) {
+  private setOutputPackedMatrixTextureDriverCS(
+      outputPackedMatrixTexture: WebGLTexture, width: number, height: number) {
     this.throwIfDisposed();
     const gl = this.gl;
-    webgl_util.bindPackedImageTexture(gl, outputMatrixTextureMaybePacked);
-    this.outputTexture = outputMatrixTextureMaybePacked;
+    webgl_util.bindPackedImageTexture(gl, outputPackedMatrixTexture);
+    this.outputTexture = outputPackedMatrixTexture;
   }
 
   private setOutputMatrixWriteRegionDriver(
