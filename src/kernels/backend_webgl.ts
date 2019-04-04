@@ -82,6 +82,7 @@ import {LRNProgram} from './webgl/lrn_gpu';
 import {LRNGradProgram} from './webgl/lrn_grad_gpu';
 import {MaxPool2DBackpropProgram} from './webgl/max_pool_backprop_gpu';
 import {MatMulPackedProgram} from './webgl/mulmat_packed_gpu';
+import {MatMulPackedProgramCS} from './webgl/mulmat_packed_gpu_cs';
 import {MultinomialProgram} from './webgl/multinomial_gpu';
 import {OneHotProgram} from './webgl/onehot_gpu';
 import {PackProgram} from './webgl/pack_gpu';
@@ -782,7 +783,7 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    const program = new MatMulPackedProgram(
+    const program = new MatMulPackedProgramCS(
         a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
     const output =
         this.makePackedTensor(program.outputShape, dtype) as Tensor3D;
