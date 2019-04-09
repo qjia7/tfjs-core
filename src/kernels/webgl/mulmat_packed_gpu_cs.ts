@@ -33,8 +33,10 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
     const sharedDim = transposeA ? aShape[1] : aShape[2];
     const sharedDimensionPacked = Math.ceil(sharedDim / 2);
 
-    const aSample = transposeA ? 'tileCol * 2, rc.y' : 'rc.y, tileCol * 2';
-    const bSample = transposeB ? 'rc.z, tileRow * 2' : 'tileRow * 2, rc.z';
+    const aSample = transposeA ? 'tileCol * 2, globalRow * 2' :
+                                 'globalRow * 2, tileCol * 2';
+    const bSample = transposeB ? 'globalCol * 2, tileRow * 2' :
+                                 'tileRow * 2, globalCol * 2';
     const aSwizzle = transposeA ? ['a.xxyy', 'a.zzww'] : ['a.xxzz', 'a.yyww'];
     const bSwizzle = transposeB ? ['b.xzxz', 'b.ywyw'] : ['b.xyxy', 'b.zwzw'];
 
@@ -63,6 +65,8 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
         ivec3 rc = getOutputCoords();
         int row = int(gl_LocalInvocationID.y);
         int col = int(gl_LocalInvocationID.x);
+        int globalRow = int(gl_GlobalInvocationID.y);
+        int globalCol = int(gl_GlobalInvocationID.x);
 
         // Loop over all tiles
         int numTiles = ${Math.ceil(sharedDimensionPacked / TS)};

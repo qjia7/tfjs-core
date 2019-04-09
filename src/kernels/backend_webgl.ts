@@ -783,8 +783,12 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    const program = new MatMulPackedProgramCS(
-        a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
+    const program = batch === 1 ?
+        new MatMulPackedProgramCS(
+            a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+            transposeB) :
+        new MatMulPackedProgram(
+            a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
     const output =
         this.makePackedTensor(program.outputShape, dtype) as Tensor3D;
     return this.compileAndRunCS<Tensor3D>(program, [a, b], output);
