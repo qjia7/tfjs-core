@@ -309,7 +309,9 @@ export class Environment {
     } else if (feature === 'WEBGL_CPU_FORWARD') {
       return true;
     } else if (feature === 'WEBGL_PACK') {
-      return false;
+      // Make WEBGL_PACK default to true. You can turn off this feature by URL:
+      // http://localhost:1234/?tfjsflags=WEBGL_PACK:false
+      return this.get('WEBGL_VERSION') === 0 ? false : true;
     } else if (feature === 'WEBGL_PACK_BATCHNORMALIZATION') {
       return this.get('WEBGL_PACK');
     } else if (feature === 'WEBGL_PACK_CLIP') {
