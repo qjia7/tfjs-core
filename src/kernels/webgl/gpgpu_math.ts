@@ -310,8 +310,8 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
   const localSize = binary.program.localGroupSize;
   localSizeX = localSize === undefined ? 32 : localSize[0];
   localSizeY = localSize === undefined ? 32 : localSize[1];
-  const numGroupX = (columns + localSizeX - 1) / localSizeX;
-  const numGroupY = (rows + localSizeY - 1) / localSizeY;
+  const numGroupX = Math.ceil(columns / localSizeX);
+  const numGroupY = Math.ceil(rows / localSizeY);
   gpgpu.executeCSProgram(numGroupX, numGroupY);
 }
 
