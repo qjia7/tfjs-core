@@ -982,6 +982,15 @@ function getOutput4DCoordsCS(
       ${coordsFromIndexSnippet}
       return ivec4(r, c, d, d2);
     }
+
+    ivec4 getFirstThreadOutputCoords() {
+      ivec2 firstThreadGlobalInvocationID =
+          ivec2(gl_WorkGroupID * gl_WorkGroupSize);
+      int index = firstThreadGlobalInvocationID.y * ${texShape[1]} +
+          firstThreadGlobalInvocationID.x;
+      ${coordsFromIndexSnippet}
+      return ivec4(r, c, d, d2);
+    }
   `;
 }
 
