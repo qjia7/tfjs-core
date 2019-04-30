@@ -62,6 +62,7 @@ import {ConcatPackedProgram} from './webgl/concat_packed_gpu';
 import {Conv2DDerFilterProgram, Conv2DDerInputProgram, Conv3DDerFilterProgram, Conv3DDerInputProgram} from './webgl/conv_backprop_gpu';
 import {DepthwiseConv2DDerFilterProgram, DepthwiseConv2DDerInputProgram} from './webgl/conv_backprop_gpu_depthwise';
 import {Conv2DProgram, Conv3DProgram} from './webgl/conv_gpu';
+import {Conv2DProgramCS} from './webgl/conv_gpu_cs';
 import {DepthwiseConv2DProgram} from './webgl/conv_gpu_depthwise';
 import {DepthwiseConvPacked2DProgram} from './webgl/conv_packed_gpu_depthwise';
 import {CropAndResizeProgram} from './webgl/crop_and_resize_gpu';
@@ -1837,6 +1838,21 @@ export class MathBackendWebGL implements KernelBackend {
     if (ENV.get('WEBGL_CONV_IM2COL') && x.shape[0] === 1) {
       return this.conv2dWithIm2Row(x, filter, convInfo);
     }
+
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]
+    // TODO:
+    // 1. Use Conv2DProgram if tensor size is not large enough
+    // 2. Output texture shape can be [N, HWC]
+    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        convInfo.outWidth % 7 === 0) {
+      const program = new Conv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
+    }
+
     const program = new Conv2DProgram(convInfo);
     return this.compileAndRunCS(program, [x, filter]);
   }
