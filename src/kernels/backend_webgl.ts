@@ -64,6 +64,7 @@ import {DepthwiseConv2DDerFilterProgram, DepthwiseConv2DDerInputProgram} from '.
 import {Conv2DProgram, Conv3DProgram} from './webgl/conv_gpu';
 import {Conv2DProgramCS} from './webgl/conv_gpu_cs';
 import {DepthwiseConv2DProgram} from './webgl/conv_gpu_depthwise';
+import {DepthwiseConv2DProgramCS} from './webgl/conv_gpu_depthwise_cs';
 import {DepthwiseConvPacked2DProgram} from './webgl/conv_packed_gpu_depthwise';
 import {CropAndResizeProgram} from './webgl/crop_and_resize_gpu';
 import {CumSumProgram} from './webgl/cumsum_gpu';
@@ -1870,13 +1871,25 @@ export class MathBackendWebGL implements KernelBackend {
 
   depthwiseConv2D(x: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
       Tensor4D {
-    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram;
+    let program: DepthwiseConv2DProgram|DepthwiseConvPacked2DProgram|
+        DepthwiseConv2DProgramCS;
     if (ENV.get('WEBGL_PACK_DEPTHWISECONV') && convInfo.strideWidth <= 2 &&
         convInfo.outChannels / convInfo.inChannels === 1) {
       program = new DepthwiseConvPacked2DProgram(convInfo);
       return this.compileAndRunCS(
           program, [x, filter],
           this.makePackedTensor(convInfo.outShape, x.dtype));
+    }
+
+    // Limitations:
+    // 1. Output texture shape must be [NHW, C], which means N*H*W <= maxTexSize
+    // 2. OutWidth should be divisible by localGroupSize[1]
+    const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
+    if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
+            maxTexSize &&
+        convInfo.outWidth % 7 === 0) {
+      program = new DepthwiseConv2DProgramCS(convInfo);
+      return this.compileAndRunCS(program, [x, filter]);
     }
 
     program = new DepthwiseConv2DProgram(convInfo);
