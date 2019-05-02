@@ -70,12 +70,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
           int c = cd / CACHE_C;
           int d = cd - c * CACHE_C;
 
-          if ((cacheRCorner + r) >= 0 &&
-              (cacheCCorner + c) >= 0 &&
-              (cacheRCorner + r) < ${convInfo.inHeight} &&
-              (cacheCCorner + c) < ${convInfo.inWidth}) {
-            cache[r][cd] = getX(batch, cacheRCorner + r * ${dilationHeight},
-                                cacheCCorner + c, d);
+          int xR = cacheRCorner + r * ${dilationHeight};
+          int xC = cacheCCorner + c;
+          if (xR >= 0 && xR < ${convInfo.inHeight} &&
+              xC >= 0 && xC < ${convInfo.inWidth}) {
+            cache[r][cd] = getX(batch, xR, xC, d);
           }
 
           index += ${this.localGroupSize[0] * this.localGroupSize[1]};
@@ -99,11 +98,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
         // ? = to be determined. : = across all values in that axis.
         float dotProd = 0.0;
         for (int wR = 0; wR < ${filterHeight}; wR++) {
-          int xR = xRCorner + wR;
+          int xR = xRCorner + wR * ${dilationHeight};
           if (xR < 0 || xR >= ${convInfo.inHeight}) {
             continue;
           }
-          int sR = xR - cacheRCorner;
+          int sR = wR;
 
           for (int wC = 0; wC < ${filterWidth}; wC++) {
             int xC = xCCorner + wC * ${dilationWidth};
