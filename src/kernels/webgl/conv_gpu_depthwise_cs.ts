@@ -49,7 +49,10 @@ export class DepthwiseConv2DProgramCS implements GPGPUProgram {
       const int CACHE_W = ${
         (this.localGroupSize[1] - 1) * strideWidth + filterWidth +
         (filterWidth - 1) * (dilationWidth - 1)};
-      const int CACHE_C = ${this.localGroupSize[0] / channelMul};
+      const int CACHE_C = ${
+        this.localGroupSize[0] < convInfo.outChannels ?
+            this.localGroupSize[0] / channelMul :
+            convInfo.inChannels};
       const int CACHE_WC = CACHE_W * CACHE_C;
       const int CACHE_HWC = CACHE_H * CACHE_W * CACHE_C;
       // Combine CACHE_W and CACHE_C
