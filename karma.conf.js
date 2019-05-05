@@ -90,6 +90,24 @@ module.exports = function(config) {
         base: 'Chrome',
         flags: ['--blacklist-accelerated-compositing', '--blacklist-webgl']
       },
+      chrome_with_opengl_backend: {
+        base: 'Chrome',
+        flags: [
+          '--use-cmd-decoder=passthrough',
+          '--enable-webgl2-compute-context',
+          '--use-gl=angle',
+          '--use-angle=gl'
+        ]
+      },
+      chrome_with_d3d_backend: {
+        base: 'Chrome',
+        flags: [
+          '--use-cmd-decoder=passthrough',
+          '--enable-webgl2-compute-context',
+          '--use-gl=angle',
+          '--use-angle=d3d11'
+        ]
+      },
       chrome_debugging:
           {base: 'Chrome', flags: ['--remote-debugging-port=9333']}
     },
