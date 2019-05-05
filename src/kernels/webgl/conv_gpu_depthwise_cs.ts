@@ -18,14 +18,16 @@
 import {Conv2DInfo} from '../../ops/conv_util';
 import {GPGPUProgram} from './gpgpu_math';
 
-export class Conv2DProgramCS implements GPGPUProgram {
+export class DepthwiseConv2DProgramCS implements GPGPUProgram {
   variableNames = ['x', 'W'];
   outputShape: number[];
   userCode: string;
-  localGroupSize: [number, number];  // x, y
+  localGroupSize: [number, number];
 
   constructor(convInfo: Conv2DInfo) {
     this.outputShape = convInfo.outShape;
+    const xNumRows = convInfo.inHeight;
+    const xNumCols = convInfo.inWidth;
     const padTop = convInfo.padInfo.top;
     const padLeft = convInfo.padInfo.left;
     const strideHeight = convInfo.strideHeight;
@@ -34,11 +36,9 @@ export class Conv2DProgramCS implements GPGPUProgram {
     const dilationWidth = convInfo.dilationWidth;
     const filterHeight = convInfo.filterHeight;
     const filterWidth = convInfo.filterWidth;
+    const channelMul = convInfo.outChannels / convInfo.inChannels;
 
-    const inputDepthNearestVec4 = Math.floor(convInfo.inChannels / 4) * 4;
-    const inputDepthVec4Remainder = convInfo.inChannels % 4;
-
-    this.localGroupSize = [8, 7];
+    this.localGroupSize = [8 * channelMul, 7];
     // outWidth should be divisible by localGroupSize[1]
 
     this.userCode = `
@@ -49,7 +49,10 @@ export class Conv2DProgramCS implements GPGPUProgram {
       const int CACHE_W = ${
         (this.localGroupSize[1] - 1) * strideWidth + filterWidth +
         (filterWidth - 1) * (dilationWidth - 1)};
-      const int CACHE_C = ${convInfo.inChannels};
+      const int CACHE_C = ${
+        this.localGroupSize[0] < convInfo.outChannels ?
+            this.localGroupSize[0] / channelMul :
+            convInfo.inChannels};
       const int CACHE_WC = CACHE_W * CACHE_C;
       const int CACHE_HWC = CACHE_H * CACHE_W * CACHE_C;
       // Combine CACHE_W and CACHE_C
@@ -57,10 +60,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
 
       void main() {
         ivec4 coords = getFirstThreadOutputCoords();
-        int batch = coords[0];
+        int batch = coords.x;
         ivec2 cacheRCCorner = coords.yz * strides - pads;
         int cacheRCorner = cacheRCCorner.x;
         int cacheCCorner = cacheRCCorner.y;
+        int cacheDCorner = coords.w / ${channelMul};
 
         // Fill cache using all threads in a local group
         int index = int(gl_LocalInvocationIndex);
@@ -72,9 +76,11 @@ export class Conv2DProgramCS implements GPGPUProgram {
 
           int xR = cacheRCorner + r * ${dilationHeight};
           int xC = cacheCCorner + c;
+          int xD = cacheDCorner + d;
           if (xR >= 0 && xR < ${convInfo.inHeight} &&
-              xC >= 0 && xC < ${convInfo.inWidth}) {
-            cache[r][cd] = getX(batch, xR, xC, d);
+              xC >= 0 && xC < ${convInfo.inWidth} &&
+              xD < ${convInfo.inChannels}) {
+            cache[r][cd] = getX(batch, xR, xC, xD);
           }
 
           index += ${this.localGroupSize[0] * this.localGroupSize[1]};
@@ -89,71 +95,34 @@ export class Conv2DProgramCS implements GPGPUProgram {
         }
 
         coords = getOutputCoords();
-        int d2 = coords[3];
         ivec2 xRCCorner = coords.yz * strides - pads;
         int xRCorner = xRCCorner.x;
         int xCCorner = xRCCorner.y;
+        int d2 = coords.w;
+        int d1 = d2 / ${channelMul};
+        int q = d2 - d1 * ${channelMul};
 
-        // Convolve x(?, ?, d1) with w(:, :, d1, d2) to get y(yR, yC, d2).
+        // Convolve x(?, ?, d1) with w(:, :, d1, q) to get y(yR, yC, d2).
         // ? = to be determined. : = across all values in that axis.
         float dotProd = 0.0;
+        // TODO: Flatten the two for loops and vec4 the operations.
         for (int wR = 0; wR < ${filterHeight}; wR++) {
           int xR = xRCorner + wR * ${dilationHeight};
-          if (xR < 0 || xR >= ${convInfo.inHeight}) {
+          if (xR < 0 || xR >= ${xNumRows}) {
             continue;
           }
           int sR = wR;
 
           for (int wC = 0; wC < ${filterWidth}; wC++) {
             int xC = xCCorner + wC * ${dilationWidth};
-            if (xC < 0 || xC >= ${convInfo.inWidth}) {
+            if (xC < 0 || xC >= ${xNumCols}) {
               continue;
             }
             int sC = (xC - cacheCCorner) * CACHE_C;
 
-            for (int d1 = 0; d1 < ${inputDepthNearestVec4}; d1 += 4) {
-              vec4 xValues = vec4(
-                cache[sR][sC + d1],
-                cache[sR][sC + d1 + 1],
-                cache[sR][sC + d1 + 2],
-                cache[sR][sC + d1 + 3]
-              );
-              vec4 wValues = vec4(
-                getW(wR, wC, d1, d2),
-                getW(wR, wC, d1 + 1, d2),
-                getW(wR, wC, d1 + 2, d2),
-                getW(wR, wC, d1 + 3, d2)
-              );
-              dotProd += dot(xValues, wValues);
-            }
-
-            if (${inputDepthVec4Remainder === 1}) {
-              dotProd +=
-                cache[sR][sC + ${inputDepthNearestVec4}] *
-                getW(wR, wC, ${inputDepthNearestVec4}, d2);
-            } else if (${inputDepthVec4Remainder === 2}) {
-              vec2 xValues = vec2(
-                cache[sR][sC + ${inputDepthNearestVec4}],
-                cache[sR][sC + ${inputDepthNearestVec4} + 1]
-              );
-              vec2 wValues = vec2(
-                getW(wR, wC, ${inputDepthNearestVec4}, d2),
-                getW(wR, wC, ${inputDepthNearestVec4} + 1, d2)
-              );
-              dotProd += dot(xValues, wValues);
-            } else if (${inputDepthVec4Remainder === 3}) {
-              vec3 xValues = vec3(
-                cache[sR][sC + ${inputDepthNearestVec4}],
-                cache[sR][sC + ${inputDepthNearestVec4} + 1],
-                cache[sR][sC + ${inputDepthNearestVec4} + 2]
-              );
-              vec3 wValues = vec3(
-                getW(wR, wC, ${inputDepthNearestVec4}, d2),
-                getW(wR, wC, ${inputDepthNearestVec4} + 1, d2),
-                getW(wR, wC, ${inputDepthNearestVec4} + 2, d2)
-              );
-              dotProd += dot(xValues, wValues);
-            }
+            float xVal = cache[sR][sC + d1 - cacheDCorner];
+            float wVal = getW(wR, wC, d1, q);
+            dotProd += xVal * wVal;
           }
         }
         setOutput(dotProd);
