@@ -1583,8 +1583,7 @@ function getSampler2DCS(inputInfo: InputInfo): string {
   const texShape = inputInfo.shapeInfo.texShape;
   const texName = inputInfo.name;
   const funcName = 'get' + texName.charAt(0).toUpperCase() + texName.slice(1);
-  const texNumR = texShape[0];
-  const texNumC = texShape[1];
+
   if (texShape != null && util.arraysEqual(shape, texShape)) {
     return `
     float ${funcName}(int row, int col) {
@@ -1615,6 +1614,9 @@ function getSampler2DCS(inputInfo: InputInfo): string {
       }
     `;
   }
+
+  const texNumR = texShape[0];
+  const texNumC = texShape[1];
   const offset = getFlatOffsetUniformName(texName);
   if (texNumC === 1) {
     return `
