@@ -33,6 +33,7 @@ export interface GPGPUProgram {
                            // shader so its output does not get eagerly unpacked
                            // by backend_webgl.compileAndRun.
   localGroupSize?: number[];
+  workPerThread?: number[];
 }
 
 export interface GPGPUBinary {
@@ -307,11 +308,15 @@ export function runCSProgram<T extends Tensor, K extends Tensor>(
     rows = Math.ceil(rows / 2);
   }
   let localSizeX, localSizeY;
+  let workPerThreadX, workPerThreadY;
   const localSize = binary.program.localGroupSize;
+  const workPerThread = binary.program.workPerThread;
   localSizeX = localSize === undefined ? 32 : localSize[0];
   localSizeY = localSize === undefined ? 32 : localSize[1];
-  const numGroupX = Math.ceil(columns / localSizeX);
-  const numGroupY = Math.ceil(rows / localSizeY);
+  workPerThreadX = workPerThread === undefined ? 1 : workPerThread[0];
+  workPerThreadY = workPerThread === undefined ? 1 : workPerThread[1];
+  const numGroupX = Math.ceil(columns / workPerThreadX / localSizeX);
+  const numGroupY = Math.ceil(rows / workPerThreadY / localSizeY);
   gpgpu.executeCSProgram(numGroupX, numGroupY);
 }
 

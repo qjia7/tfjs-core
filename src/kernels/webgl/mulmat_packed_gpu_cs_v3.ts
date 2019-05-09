@@ -34,17 +34,17 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
     const sharedDim = transposeA ? aShape[1] : aShape[2];
     const sharedDimensionPacked = Math.ceil(sharedDim / 2);
     const TS = 16;
-    const WPT = 2;
+    const WPT = 4;
     const RTS = TS / WPT;
-    this.localGroupSize = [TS, RTS];
-    this.workPerThread = [1, WPT];
+    this.localGroupSize = [RTS, RTS];
+    this.workPerThread = [WPT, WPT];
 
     const aSample = transposeA ?
-        'tileCol * 2, (globalRow + w*' + RTS + ') * 2' :
-        '(globalRow + w*' + RTS + ') * 2, tileCol * 2';
+        `(tileCol + innerCol * ${RTS})* 2, (globalRow + innerRow * ${RTS})* 2` :
+        `(globalRow + innerRow * ${RTS})* 2, (tileCol + innerCol * ${RTS})* 2`;
     const bSample = transposeB ?
-        'globalCol * 2, (tileRow + w*' + RTS + ') * 2' :
-        '(tileRow + w*' + RTS + ') * 2, globalCol * 2';
+        `(globalCol + innerCol * ${RTS})* 2, (tileRow + innerRow * ${RTS})* 2` :
+        `(tileRow + innerRow * ${RTS})* 2, (globalCol + innerCol * ${RTS})* 2`;
     const aSwizzle = transposeA ? ['a.xxyy', 'a.zzww'] : ['a.xxzz', 'a.yyww'];
     const bSwizzle = transposeB ? ['b.xzxz', 'b.ywyw'] : ['b.xyxy', 'b.zwzw'];
 
@@ -53,19 +53,17 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
       activationSnippet = `vec4 activation(vec4 x) {
         ${activation}
       }`;
-
-      applyActivationSnippet = `result = activation(result);`;
+      applyActivationSnippet = `
+        result[innerRow][innerCol] = activation(result[innerRow][innerCol]);`;
     }
 
-    const addBiasSnippet = addBias ? 'result += getBiasAtOutCoords();' : '';
     if (addBias) {
-      this.variableNames.push('bias');
+      console.error('bias is not supported');
     }
 
     this.userCode = `
       ${activationSnippet}
 
-      const float sharedDimension = ${sharedDimensionPacked}.0;
       shared vec4 Asub[${TS}][${TS}];
       shared vec4 Bsub[${TS}][${TS}];
       void main() {
@@ -75,43 +73,72 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
         int globalRow = ${TS} * int(gl_WorkGroupID.y) + row;
         int globalCol = ${TS} * int(gl_WorkGroupID.x) + col;
 
+        vec4 Breg[${WPT}];
+        vec4 result[${WPT}][${WPT}];
+
+        for (int innerRow = 0; innerRow < ${WPT}; innerRow++) {
+          for (int innerCol = 0; innerCol < ${WPT}; innerCol++) {
+            result[innerRow][innerCol] = vec4(0);
+          }
+        }
+
         // Loop over all tiles
         int numTiles = ${Math.ceil(sharedDimensionPacked / TS)};
-        vec4 result[${WPT}];
         for (int t = 0; t < numTiles; t++) {
           // Load one tile of A and B into local memory
           int tileRow = ${TS} * t + row;
           int tileCol = ${TS} * t + col;
-          for (int w = 0; w < ${WPT}; w++) {
-          Asub[row + w*${RTS}][col] = getMatrixA(rc.x, ${aSample});
-          Bsub[row + w*${RTS}][col] = getMatrixB(rc.x, ${bSample});
+          for (int innerRow = 0; innerRow < ${WPT}; innerRow++) {
+            int inputRow = row + innerRow * ${RTS};
+            for (int innerCol = 0; innerCol < ${WPT}; innerCol++) {
+              int inputCol = col + innerCol * ${RTS};
+              Asub[inputRow][inputCol] = getMatrixA(rc.x, ${aSample});
+              Bsub[inputRow][inputCol] = getMatrixB(rc.x, ${bSample});
+            }
           }
+
           memoryBarrierShared();
           barrier();
 
-          // If the tile size is larger than the shared dimension, we should
-          // limit the size to |sharedDimensionPacked|.
+          // Loop over the values of a single tile
           int sizeTS = (t == (numTiles - 1) &&
                         ${sharedDimensionPacked % TS} != 0) ?
-                       ${sharedDimensionPacked % TS} : ${TS};
-          for (int i = 0; i < sizeTS; i++) {
-            vec4 b = Bsub[i][col];
-            for (int w = 0; w < ${WPT}; w++) {
-            vec4 a = Asub[row + w * ${RTS}][i];
-            result[w] += (${aSwizzle[0]} * ${bSwizzle[0]}) +
-                         (${aSwizzle[1]} * ${bSwizzle[1]});
+                        ${sharedDimensionPacked % TS} : ${TS};
+          for (int k = 0; k < sizeTS; k++) {
+            for (int inner = 0; inner < ${WPT}; inner++) {
+              Breg[inner] = Bsub[k][col + inner * ${RTS}];
+            }
+
+            for (int innerRow = 0; innerRow < ${WPT}; innerRow++) {
+              vec4 a = Asub[row + innerRow * ${RTS}][k];
+              for (int innerCol = 0; innerCol < ${WPT}; innerCol++) {
+                vec4 b = Breg[innerCol];
+                result[innerRow][innerCol] +=
+                    (${aSwizzle[0]} * ${bSwizzle[0]}) +
+                    (${aSwizzle[1]} * ${bSwizzle[1]});
+              }
             }
           }
 
           // Synchronize before loading the next tile.
           barrier();
         }
-        ${addBiasSnippet}
 
-        ${applyActivationSnippet}
-        for (int w = 0; w < ${WPT}; w++) {
-        imageStore(outputColor, ivec2(globalCol, globalRow + w*${RTS}),
-           result[w]);
+        // Store the final result
+        for (int innerRow = 0; innerRow < ${WPT}; innerRow++) {
+          int outputRow = globalRow + innerRow * ${RTS};
+          if (outputRow >= ${Math.ceil(this.outputShape[1] / 2)}) {
+            continue;
+          }
+          for (int innerCol = 0; innerCol < ${WPT}; innerCol++) {
+            int outputCol = globalCol + innerCol * ${RTS};
+            if (outputCol >= ${Math.ceil(this.outputShape[2] / 2)}) {
+              continue;
+            }
+            ${applyActivationSnippet}
+            imageStore(outputColor, ivec2(outputCol, outputRow),
+                       result[innerRow][innerCol]);
+          }
         }
       }
     `;
