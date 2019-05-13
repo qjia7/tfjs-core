@@ -308,6 +308,16 @@ export class Environment {
       return isChrome();
     } else if (feature === 'WEBGL_CPU_FORWARD') {
       return true;
+    } else if (feature === 'WEBGL_MATMUL_VERSION') {
+      // 0: MatMulPackedProgram
+      // 1: MatMulPackedProgramCS
+      // 2: MatMulPackedProgramCSV2
+      // 3: MatMulPackedProgramCSV3
+      return 1;
+    } else if (feature === 'WEBGL_MATMUL_TS') {
+      return 16;
+    } else if (feature === 'WEBGL_MATMUL_WPT') {
+      return 4;
     } else if (feature === 'WEBGL_PACK') {
       // Make WEBGL_PACK default to true. You can turn off this feature by URL:
       // http://localhost:1234/?tfjsflags=WEBGL_PACK:false

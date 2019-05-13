@@ -17,7 +17,7 @@
 
 import {GPGPUProgram} from './gpgpu_math';
 
-export class MatMulPackedProgramCS implements GPGPUProgram {
+export class MatMulPackedProgramCSV3 implements GPGPUProgram {
   variableNames = ['matrixA', 'matrixB'];
   usesPackedTextures = true;
   outputShape: number[];
@@ -27,14 +27,12 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
 
   constructor(
       aShape: [number, number, number], outputShape: [number, number, number],
-      transposeA = false, transposeB = false, addBias = false,
-      activation: string = null) {
+      transposeA = false, transposeB = false, TS: number, WPT: number,
+      addBias = false, activation: string = null) {
     this.outputShape = outputShape;
 
     const sharedDim = transposeA ? aShape[1] : aShape[2];
     const sharedDimensionPacked = Math.ceil(sharedDim / 2);
-    const TS = 16;
-    const WPT = 4;
     const RTS = TS / WPT;
     this.localGroupSize = [RTS, RTS];
     this.workPerThread = [WPT, WPT];

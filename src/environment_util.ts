@@ -28,6 +28,13 @@ export interface Features {
   'WEBGL_LAZILY_UNPACK'?: boolean;
   // Whether the WebGL backend will sometimes forward ops to the CPU.
   'WEBGL_CPU_FORWARD'?: boolean;
+  // 0: MatMulPackedProgram, 1: MatMulPackedProgramCS,
+  // 2: MatMulPackedProgramCSV2, 3:MatMulPackedProgramCSV3
+  'WEBGL_MATMUL_VERSION'?: number;
+  // Tile size in MatMulPackedProgramCS*
+  'WEBGL_MATMUL_TS'?: number;
+  // Work per thread in MatMulPackedProgramCSV*
+  'WEBGL_MATMUL_WPT'?: number;
   // Whether to turn all packing related flags on.
   'WEBGL_PACK'?: boolean;
   // Whether we will pack the batchnormalization op.
@@ -111,6 +118,9 @@ export const URL_PROPERTIES: URLProperty[] = [
   {name: 'IS_BROWSER', type: Type.BOOLEAN},
   {name: 'WEBGL_LAZILY_UNPACK', type: Type.BOOLEAN},
   {name: 'WEBGL_CPU_FORWARD', type: Type.BOOLEAN},
+  {name: 'WEBGL_MATMUL_VERSION', type: Type.NUMBER},
+  {name: 'WEBGL_MATMUL_TS', type: Type.NUMBER},
+  {name: 'WEBGL_MATMUL_WPT', type: Type.NUMBER},
   {name: 'WEBGL_PACK', type: Type.BOOLEAN},
   {name: 'WEBGL_PACK_BATCHNORMALIZATION', type: Type.BOOLEAN},
   {name: 'WEBGL_PACK_CLIP', type: Type.BOOLEAN},

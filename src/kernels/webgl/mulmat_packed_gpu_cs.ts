@@ -26,7 +26,7 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
 
   constructor(
       aShape: [number, number, number], outputShape: [number, number, number],
-      transposeA = false, transposeB = false, addBias = false,
+      transposeA = false, transposeB = false, TS: number, addBias = false,
       activation: string = null) {
     this.outputShape = outputShape;
 
@@ -53,8 +53,7 @@ export class MatMulPackedProgramCS implements GPGPUProgram {
     if (addBias) {
       this.variableNames.push('bias');
     }
-    this.localGroupSize = [32, 32];
-    const TS = 32;
+    this.localGroupSize = [TS, TS];
     this.userCode = `
       ${activationSnippet}
 
