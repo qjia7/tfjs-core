@@ -309,6 +309,7 @@ export function bindColorImageTexture(
       gl,
       // tslint:disable-next-line:no-any
       () => (gl as any).bindImageTexture(
+          // tslint:disable-next-line:no-any
           4, texture, 0, (gl as any).FALSE,
           // tslint:disable-next-line:no-any
           0, (gl as any).WRITE_ONLY, (gl as any).R32F));
@@ -320,6 +321,7 @@ export function bindPackedImageTexture(
       gl,
       // tslint:disable-next-line:no-any
       () => (gl as any).bindImageTexture(
+          // tslint:disable-next-line:no-any
           4, texture, 0, (gl as any).FALSE,
           // tslint:disable-next-line:no-any
           0, (gl as any).WRITE_ONLY, (gl as any).RGBA32F));
