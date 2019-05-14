@@ -88,6 +88,7 @@ import {MatMulPackedProgram} from './webgl/mulmat_packed_gpu';
 import {MatMulPackedProgramCS} from './webgl/mulmat_packed_gpu_cs';
 import {MatMulPackedProgramCSV2} from './webgl/mulmat_packed_gpu_cs_v2';
 import {MatMulPackedProgramCSV3} from './webgl/mulmat_packed_gpu_cs_v3';
+import {MatMulPackedProgramCSV4} from './webgl/mulmat_packed_gpu_cs_v4';
 import {MultinomialProgram} from './webgl/multinomial_gpu';
 import {OneHotProgram} from './webgl/onehot_gpu';
 import {PackProgram} from './webgl/pack_gpu';
@@ -815,8 +816,14 @@ export class MathBackendWebGL implements KernelBackend {
               transposeB, ENV.get('WEBGL_MATMUL_TS'),
               ENV.get('WEBGL_MATMUL_WPT'));
           break;
+        case 4:
+          program = new MatMulPackedProgramCSV4(
+              a.shape, [batch, outerShapeA, outerShapeB], transposeA,
+              transposeB, ENV.get('WEBGL_MATMUL_TS'),
+              ENV.get('WEBGL_MATMUL_TSK'), ENV.get('WEBGL_MATMUL_WPT'));
+          break;
         default:
-          console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3');
+          console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
       }
     } else {
       program = new MatMulPackedProgram(
@@ -1874,8 +1881,14 @@ export class MathBackendWebGL implements KernelBackend {
             im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
             ENV.get('WEBGL_MATMUL_TS'), ENV.get('WEBGL_MATMUL_WPT'));
         break;
+      case 4:
+        matmulProgram = new MatMulPackedProgramCSV4(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.get('WEBGL_MATMUL_TS'), ENV.get('WEBGL_MATMUL_TSK'),
+            ENV.get('WEBGL_MATMUL_WPT'));
+        break;
       default:
-        console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3');
+        console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
     }
 
     const product =
