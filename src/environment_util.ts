@@ -30,9 +30,12 @@ export interface Features {
   'WEBGL_CPU_FORWARD'?: boolean;
   // 0: MatMulPackedProgram, 1: MatMulPackedProgramCS,
   // 2: MatMulPackedProgramCSV2, 3:MatMulPackedProgramCSV3
+  // 4: MatMulPackedProgramCSV4
   'WEBGL_MATMUL_VERSION'?: number;
   // Tile size in MatMulPackedProgramCS*
   'WEBGL_MATMUL_TS'?: number;
+  // Tile size in dimension-K in MatMulPackedProgramCSV4
+  'WEBGL_MATMUL_TSK'?: number;
   // Work per thread in MatMulPackedProgramCSV*
   'WEBGL_MATMUL_WPT'?: number;
   // Whether to turn all packing related flags on.
@@ -120,6 +123,7 @@ export const URL_PROPERTIES: URLProperty[] = [
   {name: 'WEBGL_CPU_FORWARD', type: Type.BOOLEAN},
   {name: 'WEBGL_MATMUL_VERSION', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_TS', type: Type.NUMBER},
+  {name: 'WEBGL_MATMUL_TSK', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_WPT', type: Type.NUMBER},
   {name: 'WEBGL_PACK', type: Type.BOOLEAN},
   {name: 'WEBGL_PACK_BATCHNORMALIZATION', type: Type.BOOLEAN},

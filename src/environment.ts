@@ -309,15 +309,26 @@ export class Environment {
     } else if (feature === 'WEBGL_CPU_FORWARD') {
       return true;
     } else if (feature === 'WEBGL_MATMUL_VERSION') {
-      // 0: MatMulPackedProgram
-      // 1: MatMulPackedProgramCS
-      // 2: MatMulPackedProgramCSV2
-      // 3: MatMulPackedProgramCSV3
-      return 1;
-    } else if (feature === 'WEBGL_MATMUL_TS') {
-      return 16;
+      // 0: MatMulPackedProgram     - Naive implementation
+      // 1: MatMulPackedProgramCS   - Tiling in the local memory
+      // 2: MatMulPackedProgramCSV2 - More work per thread (square tiles)
+      // 3: MatMulPackedProgramCSV3 - 2D register blocking (square tiles)
+      // 4: MatMulPackedProgramCSV4 - 2D register blocking (rectangular tiles)
+      return 0;
+    }
+    // The following 3 parameters have important effects on the performance
+    // of matrix multiplication and need to be adjusted for different machines.
+    // On Intel(R) HD Graphics 530, {VERSION=4, TS=16, TSK=8, WPT=2} performs
+    // best, with a 23 percent speed increase over version 0.
+    else if (feature === 'WEBGL_MATMUL_TS') {
+      // Tile size in version 1/2/3/4. In version 4, it is equal to TSM and TSN.
+      return 8;
+    } else if (feature === 'WEBGL_MATMUL_TSK') {
+      // Tile size in dimension-K in version 4
+      return 8;
     } else if (feature === 'WEBGL_MATMUL_WPT') {
-      return 4;
+      // Work per thread in version 2/3/4
+      return 2;
     } else if (feature === 'WEBGL_PACK') {
       // Make WEBGL_PACK default to true. You can turn off this feature by URL:
       // http://localhost:1234/?tfjsflags=WEBGL_PACK:false

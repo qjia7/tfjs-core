@@ -37,12 +37,10 @@ export class MatMulPackedProgramCSV2 implements GPGPUProgram {
     this.localGroupSize = [TS, RTS];
     this.workPerThread = [1, WPT];
 
-    const aSample = transposeA ?
-        'tileCol * 2, (globalRow + w*' + RTS + ') * 2' :
-        '(globalRow + w*' + RTS + ') * 2, tileCol * 2';
-    const bSample = transposeB ?
-        'globalCol * 2, (tileRow + w*' + RTS + ') * 2' :
-        '(tileRow + w*' + RTS + ') * 2, globalCol * 2';
+    const aSample = transposeA ? `tileCol * 2, (globalRow + w * ${RTS}) * 2` :
+                                 `(globalRow + w * ${RTS}) * 2, tileCol * 2`;
+    const bSample = transposeB ? `globalCol * 2, (tileRow + w * ${RTS}) * 2` :
+                                 `(tileRow + w * ${RTS}) * 2, globalCol * 2`;
     const aSwizzle = transposeA ? ['a.xxyy', 'a.zzww'] : ['a.xxzz', 'a.yyww'];
     const bSwizzle = transposeB ? ['b.xzxz', 'b.ywyw'] : ['b.xyxy', 'b.zwzw'];
 

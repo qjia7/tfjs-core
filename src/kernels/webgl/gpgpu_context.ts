@@ -440,6 +440,7 @@ export class GPGPUContext {
         gl, () => (gl as any).dispatchCompute(numGroupX, numGroupY, 1));
     // tslint:disable-next-line:no-any
     (gl as any).memoryBarrier(
+        // tslint:disable-next-line:no-any
         (gl as any).TEXTURE_UPDATE_BARRIER_BIT |
         // tslint:disable-next-line:no-any
         (gl as any).FRAMEBUFFER_BARRIER_BIT);
