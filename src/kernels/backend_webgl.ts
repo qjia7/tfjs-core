@@ -1917,12 +1917,15 @@ export class MathBackendWebGL implements KernelBackend {
     // 2. OutWidth should be divisible by localGroupSize[1]
     // TODO:
     // 1. Use Conv2DProgram if tensor size is not large enough
-    // 2. Output texture shape can be [N, HWC]
+    // 2. Output texture shape can be [H, WC] (N=1)
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
-        convInfo.outWidth % 7 === 0) {
-      const program = new Conv2DProgramCS(convInfo);
+        convInfo.outWidth % ENV.get('WEBGL_CONV_LS_Y') === 0) {
+      const localGroupSize =
+          [ENV.get('WEBGL_CONV_LS_X'),
+           ENV.get('WEBGL_CONV_LS_Y')] as [number, number];
+      const program = new Conv2DProgramCS(convInfo, localGroupSize);
       return this.compileAndRunCS(program, [x, filter]);
     }
 

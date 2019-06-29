@@ -28,6 +28,10 @@ export interface Features {
   'WEBGL_LAZILY_UNPACK'?: boolean;
   // Whether the WebGL backend will sometimes forward ops to the CPU.
   'WEBGL_CPU_FORWARD'?: boolean;
+  // Local size x in Conv2DProgramCS
+  'WEBGL_CONV_LS_X'?: number;
+  // Local size y in Conv2DProgramCS
+  'WEBGL_CONV_LS_Y'?: number;
   // 0: MatMulPackedProgramCSV0, 1: MatMulPackedProgramCSV1,
   // 2: MatMulPackedProgramCSV2, 3: MatMulPackedProgramCSV3
   // 4: MatMulPackedProgramCSV4
@@ -123,6 +127,8 @@ export const URL_PROPERTIES: URLProperty[] = [
   {name: 'IS_BROWSER', type: Type.BOOLEAN},
   {name: 'WEBGL_LAZILY_UNPACK', type: Type.BOOLEAN},
   {name: 'WEBGL_CPU_FORWARD', type: Type.BOOLEAN},
+  {name: 'WEBGL_CONV_LS_X', type: Type.NUMBER},
+  {name: 'WEBGL_CONV_LS_Y', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_VERSION', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_V0_LS', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_TS', type: Type.NUMBER},

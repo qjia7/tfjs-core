@@ -308,6 +308,10 @@ export class Environment {
       return isChrome();
     } else if (feature === 'WEBGL_CPU_FORWARD') {
       return true;
+    } else if (feature === 'WEBGL_CONV_LS_X') {
+      return 32;
+    } else if (feature === 'WEBGL_CONV_LS_Y') {
+      return 7;
     } else if (feature === 'WEBGL_MATMUL_VERSION') {
       // 0: MatMulPackedProgramCSV0 - Naive implementation
       // 1: MatMulPackedProgramCSV1 - Tiling in the local memory
