@@ -28,15 +28,17 @@ export interface Features {
   'WEBGL_LAZILY_UNPACK'?: boolean;
   // Whether the WebGL backend will sometimes forward ops to the CPU.
   'WEBGL_CPU_FORWARD'?: boolean;
-  // 0: MatMulPackedProgram, 1: MatMulPackedProgramCS,
-  // 2: MatMulPackedProgramCSV2, 3:MatMulPackedProgramCSV3
+  // 0: MatMulPackedProgramCSV0, 1: MatMulPackedProgramCSV1,
+  // 2: MatMulPackedProgramCSV2, 3: MatMulPackedProgramCSV3
   // 4: MatMulPackedProgramCSV4
   'WEBGL_MATMUL_VERSION'?: number;
-  // Tile size in MatMulPackedProgramCS*
+  // Local size in version 0
+  'WEBGL_MATMUL_V0_LS'?: number;
+  // Tile size in version 1/2/3/4
   'WEBGL_MATMUL_TS'?: number;
-  // Tile size in dimension-K in MatMulPackedProgramCSV4
+  // Tile size in dimension-K in version 4
   'WEBGL_MATMUL_TSK'?: number;
-  // Work per thread in MatMulPackedProgramCSV*
+  // Work per thread in version 2/3/4
   'WEBGL_MATMUL_WPT'?: number;
   // Whether to turn all packing related flags on.
   'WEBGL_PACK'?: boolean;
@@ -122,6 +124,7 @@ export const URL_PROPERTIES: URLProperty[] = [
   {name: 'WEBGL_LAZILY_UNPACK', type: Type.BOOLEAN},
   {name: 'WEBGL_CPU_FORWARD', type: Type.BOOLEAN},
   {name: 'WEBGL_MATMUL_VERSION', type: Type.NUMBER},
+  {name: 'WEBGL_MATMUL_V0_LS', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_TS', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_TSK', type: Type.NUMBER},
   {name: 'WEBGL_MATMUL_WPT', type: Type.NUMBER},

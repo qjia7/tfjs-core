@@ -85,7 +85,8 @@ import {LRNProgram} from './webgl/lrn_gpu';
 import {LRNGradProgram} from './webgl/lrn_grad_gpu';
 import {MaxPool2DBackpropProgram} from './webgl/max_pool_backprop_gpu';
 import {MatMulPackedProgram} from './webgl/mulmat_packed_gpu';
-import {MatMulPackedProgramCS} from './webgl/mulmat_packed_gpu_cs';
+import {MatMulPackedProgramCSV0} from './webgl/mulmat_packed_gpu_cs_v0';
+import {MatMulPackedProgramCSV1} from './webgl/mulmat_packed_gpu_cs_v1';
 import {MatMulPackedProgramCSV2} from './webgl/mulmat_packed_gpu_cs_v2';
 import {MatMulPackedProgramCSV3} from './webgl/mulmat_packed_gpu_cs_v3';
 import {MatMulPackedProgramCSV4} from './webgl/mulmat_packed_gpu_cs_v4';
@@ -789,18 +790,18 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    let program: MatMulPackedProgram|MatMulPackedProgramCS|
-        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3;
+    let program: MatMulPackedProgramCSV0|MatMulPackedProgramCSV1|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     if (batch === 1) {
       switch (ENV.get('WEBGL_MATMUL_VERSION')) {
         case 0:
-          program = new MatMulPackedProgram(
+          program = new MatMulPackedProgramCSV0(
               a.shape, [batch, outerShapeA, outerShapeB], transposeA,
-              transposeB);
+              transposeB, ENV.get('WEBGL_MATMUL_V0_LS'));
           break;
         case 1:
-          program = new MatMulPackedProgramCS(
+          program = new MatMulPackedProgramCSV1(
               a.shape, [batch, outerShapeA, outerShapeB], transposeA,
               transposeB, ENV.get('WEBGL_MATMUL_TS'));
           break;
@@ -826,8 +827,9 @@ export class MathBackendWebGL implements KernelBackend {
           console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
       }
     } else {
-      program = new MatMulPackedProgram(
-          a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
+      program = new MatMulPackedProgramCSV0(
+          a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB,
+          ENV.get('WEBGL_MATMUL_V0_LS'));
     }
 
     const output =
@@ -1858,16 +1860,17 @@ export class MathBackendWebGL implements KernelBackend {
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
-    let matmulProgram: MatMulPackedProgram|MatMulPackedProgramCS|
-        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3;
+    let matmulProgram: MatMulPackedProgramCSV0|MatMulPackedProgramCSV1|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     switch (ENV.get('WEBGL_MATMUL_VERSION')) {
       case 0:
-        matmulProgram = new MatMulPackedProgram(
-            im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
+        matmulProgram = new MatMulPackedProgramCSV0(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.get('WEBGL_MATMUL_V0_LS'));
         break;
       case 1:
-        matmulProgram = new MatMulPackedProgramCS(
+        matmulProgram = new MatMulPackedProgramCSV1(
             im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
             ENV.get('WEBGL_MATMUL_TS'));
         break;

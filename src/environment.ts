@@ -309,12 +309,15 @@ export class Environment {
     } else if (feature === 'WEBGL_CPU_FORWARD') {
       return true;
     } else if (feature === 'WEBGL_MATMUL_VERSION') {
-      // 0: MatMulPackedProgram     - Naive implementation
-      // 1: MatMulPackedProgramCS   - Tiling in the local memory
+      // 0: MatMulPackedProgramCSV0 - Naive implementation
+      // 1: MatMulPackedProgramCSV1 - Tiling in the local memory
       // 2: MatMulPackedProgramCSV2 - More work per thread (square tiles)
       // 3: MatMulPackedProgramCSV3 - 2D register blocking (square tiles)
       // 4: MatMulPackedProgramCSV4 - 2D register blocking (rectangular tiles)
       return 0;
+    } else if (feature === 'WEBGL_MATMUL_V0_LS') {
+      // Local size in version 0
+      return 32;
     }
     // The following 3 parameters have important effects on the performance
     // of matrix multiplication and need to be adjusted for different machines.
