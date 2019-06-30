@@ -5,6 +5,8 @@
   <script src="../dist/tf-core.js"></script>
   <script src="./conv2d_benchmark.js"></script>
   <script src="./matmul_benchmark.js"></script>
+  <script src="./mobilenet_benchmark.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-layers@1.0.1/dist/tf-layers.min.js"></script>
   <script type="text/javascript">
     // for conv2dBenchmark
     var LS_X1 = 32, LS_Y1 = 4; // case 1
@@ -12,6 +14,8 @@
     // for matMulBenchmark
     var N = 1024, version = 0, LS = 32, TS = 16, WPT = 2; // version 0~3
     var N4 = 1024, TSMN = 32, TSK = 16, WPTMN = 4;        // version 4
+    // for mobilenetBenchmark
+    var version_ = 0, LS_ = 32, TS_ = 16, WPT_ = 2;       // version 0~3
 
     function showNumTensors() {
       document.getElementById('numTensors').innerText =
@@ -131,6 +135,37 @@
   WPTM/N=<select onchange="WPTMN=parseInt(this.options[this.selectedIndex].value)">
     <option value="2">2
     <option value="4" selected>4
+    <option value="8">8
+  </select>
+
+
+  <!-- MobileNet benchmark -->
+  <h1>MobileNet benchmark (Average 100)</h1>
+  <p>mobilenet_v1_1.0_224</p>
+  <p>based on matmul version 0~3</p>
+  <p id="mobilenetOutput"></p>
+  <input type="button" onclick="mobilenetBenchmark(version_, LS_, TS_, WPT_)" value="Run" size="1">
+  version=<select onchange="version_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="0" selected>0
+    <option value="1">1
+    <option value="2">2
+    <option value="3">3
+  </select>
+  LS=<select onchange="LS_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="1">1
+    <option value="4">4
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+  </select>
+  TS=<select onchange="TS_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="8">8
+    <option value="16" selected>16
+    <option value="32">32
+  </select>
+  WPT=<select onchange="WPT_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="2" selected>2
+    <option value="4">4
     <option value="8">8
   </select>
 
