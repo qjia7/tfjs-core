@@ -85,7 +85,8 @@ import {LRNProgram} from './webgl/lrn_gpu';
 import {LRNGradProgram} from './webgl/lrn_grad_gpu';
 import {MaxPool2DBackpropProgram} from './webgl/max_pool_backprop_gpu';
 import {MatMulPackedProgram} from './webgl/mulmat_packed_gpu';
-import {MatMulPackedProgramCS} from './webgl/mulmat_packed_gpu_cs';
+import {MatMulPackedProgramCSV0} from './webgl/mulmat_packed_gpu_cs_v0';
+import {MatMulPackedProgramCSV1} from './webgl/mulmat_packed_gpu_cs_v1';
 import {MatMulPackedProgramCSV2} from './webgl/mulmat_packed_gpu_cs_v2';
 import {MatMulPackedProgramCSV3} from './webgl/mulmat_packed_gpu_cs_v3';
 import {MatMulPackedProgramCSV4} from './webgl/mulmat_packed_gpu_cs_v4';
@@ -260,7 +261,7 @@ export class MathBackendWebGL implements KernelBackend {
     this.gpgpu.uploadPixelDataToTexture(
         this.getTexture(tempPixelHandle.dataId), pixels as ImageData);
     const program = new FromPixelsProgram(outShape);
-    const res = this.compileAndRunCS(program, [tempPixelHandle]);
+    const res = this.compileAndRun(program, [tempPixelHandle]);
 
     this.disposeData(tempPixelHandle.dataId);
 
@@ -789,18 +790,18 @@ export class MathBackendWebGL implements KernelBackend {
 
     const dtype = upcastType(a.dtype, b.dtype);
 
-    let program: MatMulPackedProgram|MatMulPackedProgramCS|
-        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3;
+    let program: MatMulPackedProgramCSV0|MatMulPackedProgramCSV1|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     if (batch === 1) {
       switch (ENV.get('WEBGL_MATMUL_VERSION')) {
         case 0:
-          program = new MatMulPackedProgram(
+          program = new MatMulPackedProgramCSV0(
               a.shape, [batch, outerShapeA, outerShapeB], transposeA,
-              transposeB);
+              transposeB, ENV.get('WEBGL_MATMUL_V0_LS'));
           break;
         case 1:
-          program = new MatMulPackedProgramCS(
+          program = new MatMulPackedProgramCSV1(
               a.shape, [batch, outerShapeA, outerShapeB], transposeA,
               transposeB, ENV.get('WEBGL_MATMUL_TS'));
           break;
@@ -826,8 +827,9 @@ export class MathBackendWebGL implements KernelBackend {
           console.error('WEBGL_MATMUL_VERSION must be 0|1|2|3|4');
       }
     } else {
-      program = new MatMulPackedProgram(
-          a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB);
+      program = new MatMulPackedProgramCSV0(
+          a.shape, [batch, outerShapeA, outerShapeB], transposeA, transposeB,
+          ENV.get('WEBGL_MATMUL_V0_LS'));
     }
 
     const output =
@@ -915,13 +917,13 @@ export class MathBackendWebGL implements KernelBackend {
       const batchNormPackedProgram = new BatchNormPackedProgram(
           x.shape, mean.shape, variance.shape, offsetShape, scaleShape,
           varianceEpsilon);
-      return this.compileAndRunCS<Tensor4D>(batchNormPackedProgram, inputs);
+      return this.compileAndRun<Tensor4D>(batchNormPackedProgram, inputs);
     }
 
     const batchNormProgram = new BatchNormProgram(
         x.shape, mean.shape, variance.shape, offsetShape, scaleShape,
         varianceEpsilon);
-    return this.compileAndRunCS(batchNormProgram, inputs);
+    return this.compileAndRun(batchNormProgram, inputs);
   }
 
   localResponseNormalization4D(
@@ -960,7 +962,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = ENV.get('WEBGL_PACK_ARRAY_OPERATIONS') ?
         new TransposePackedProgram(x.shape, perm) :
         new TransposeProgram(x.shape, perm);
-    return this.compileAndRunCS(program, [x]);
+    return this.compileAndRun(program, [x]);
   }
 
   gather<T extends Tensor>(x: T, indices: Tensor1D, axis: number): T {
@@ -1036,7 +1038,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = new ReduceProgram(reduceInfo, reduceType);
     const [rows, cols] = program.outputShape;
     const output = this.makeOutputArray<Tensor2D>([rows, cols], dtype);
-    this.compileAndRunCS(program, [x], output);
+    this.compileAndRun(program, [x], output);
     // No need to run another GPGPU program.
     if (output.shape[1] === 1) {
       return output;
@@ -1321,7 +1323,7 @@ export class MathBackendWebGL implements KernelBackend {
         new BinaryOpPackedProgram(binaryop_packed_gpu.MIN, a.shape, b.shape) :
         new BinaryOpProgram(binaryop_gpu.MIN, a.shape, b.shape);
     const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRunCS(program, [a, b], null, customSetup);
+    return this.compileAndRun(program, [a, b], null, customSetup);
   }
 
   mod(a: Tensor, b: Tensor): Tensor {
@@ -1393,7 +1395,7 @@ export class MathBackendWebGL implements KernelBackend {
     // }
     const program = new BinaryOpProgram(op, a.shape, b.shape);
     const output = this.makeOutputArray(program.outputShape, outputDtype);
-    return this.compileAndRunCS<Tensor>(program, [a, b], output);
+    return this.compileAndRun<Tensor>(program, [a, b], output);
   }
 
   floorDiv(a: Tensor, b: Tensor): Tensor {
@@ -1423,14 +1425,14 @@ export class MathBackendWebGL implements KernelBackend {
     }
     const program = new BinaryOpProgram(binaryop_gpu.ADD, a.shape, b.shape);
     const output = this.makeOutputArray(program.outputShape, dtype) as Tensor;
-    return this.compileAndRunCS<Tensor>(program, [a, b], output);
+    return this.compileAndRun<Tensor>(program, [a, b], output);
   }
 
   private packedBinaryOp(
       a: TensorHandle, b: TensorHandle, op: string, dtype: DataType) {
     const program = new BinaryOpPackedProgram(op, a.shape, b.shape);
     const output = this.makePackedTensor(program.outputShape, dtype) as Tensor;
-    return this.compileAndRunCS<Tensor>(program, [a, b], output);
+    return this.compileAndRun<Tensor>(program, [a, b], output);
   }
 
   /**
@@ -1498,7 +1500,7 @@ export class MathBackendWebGL implements KernelBackend {
     }
     const program = new BinaryOpProgram(binaryop_gpu.SUB, a.shape, b.shape);
     const output = this.makeOutputArray(program.outputShape, dtype) as Tensor;
-    return this.compileAndRunCS<Tensor>(program, [a, b], output);
+    return this.compileAndRun<Tensor>(program, [a, b], output);
   }
 
   pow<T extends Tensor>(a: T, b: Tensor): T {
@@ -1541,7 +1543,7 @@ export class MathBackendWebGL implements KernelBackend {
     } else {
       program = new UnaryOpProgram(x.shape, unary_op.EXP);
     }
-    return this.compileAndRunCS(program, [x]) as T;
+    return this.compileAndRun(program, [x]) as T;
   }
 
   expm1<T extends Tensor>(x: T): T {
@@ -1557,7 +1559,7 @@ export class MathBackendWebGL implements KernelBackend {
       program = new UnaryOpProgram(x.shape, unary_op.LOG);
     }
     const customSetup = program.getCustomSetupFunc();
-    return this.compileAndRunCS(program, [x], null, customSetup) as T;
+    return this.compileAndRun(program, [x], null, customSetup) as T;
   }
 
   log1p<T extends Tensor>(x: T): T {
@@ -1595,7 +1597,7 @@ export class MathBackendWebGL implements KernelBackend {
     } else {
       program = new UnaryOpProgram(x.shape, unary_op.RELU);
     }
-    return this.compileAndRunCS(program, [x]) as T;
+    return this.compileAndRun(program, [x]) as T;
   }
 
   prelu<T extends Tensor>(x: T, alpha: T): T {
@@ -1858,16 +1860,17 @@ export class MathBackendWebGL implements KernelBackend {
           1, x2ColShape[0], x2ColShape[1]
         ]) as Tensor3D;
 
-    let matmulProgram: MatMulPackedProgram|MatMulPackedProgramCS|
-        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3;
+    let matmulProgram: MatMulPackedProgramCSV0|MatMulPackedProgramCSV1|
+        MatMulPackedProgramCSV2|MatMulPackedProgramCSV3|MatMulPackedProgramCSV4;
 
     switch (ENV.get('WEBGL_MATMUL_VERSION')) {
       case 0:
-        matmulProgram = new MatMulPackedProgram(
-            im2Col.shape, [1, numCols, convInfo.outChannels], true, false);
+        matmulProgram = new MatMulPackedProgramCSV0(
+            im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
+            ENV.get('WEBGL_MATMUL_V0_LS'));
         break;
       case 1:
-        matmulProgram = new MatMulPackedProgramCS(
+        matmulProgram = new MatMulPackedProgramCSV1(
             im2Col.shape, [1, numCols, convInfo.outChannels], true, false,
             ENV.get('WEBGL_MATMUL_TS'));
         break;
@@ -1914,17 +1917,20 @@ export class MathBackendWebGL implements KernelBackend {
     // 2. OutWidth should be divisible by localGroupSize[1]
     // TODO:
     // 1. Use Conv2DProgram if tensor size is not large enough
-    // 2. Output texture shape can be [N, HWC]
+    // 2. Output texture shape can be [H, WC] (N=1)
     const maxTexSize = ENV.get('WEBGL_MAX_TEXTURE_SIZE');
     if (convInfo.batchSize * convInfo.outHeight * convInfo.outWidth <=
             maxTexSize &&
-        convInfo.outWidth % 7 === 0) {
-      const program = new Conv2DProgramCS(convInfo);
+        convInfo.outWidth % ENV.get('WEBGL_CONV_LS_Y') === 0) {
+      const localGroupSize =
+          [ENV.get('WEBGL_CONV_LS_X'),
+           ENV.get('WEBGL_CONV_LS_Y')] as [number, number];
+      const program = new Conv2DProgramCS(convInfo, localGroupSize);
       return this.compileAndRunCS(program, [x, filter]);
     }
 
     const program = new Conv2DProgram(convInfo);
-    return this.compileAndRunCS(program, [x, filter]);
+    return this.compileAndRun(program, [x, filter]);
   }
 
   conv2dDerInput(dy: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
@@ -1945,7 +1951,7 @@ export class MathBackendWebGL implements KernelBackend {
     if (ENV.get('WEBGL_PACK_DEPTHWISECONV') && convInfo.strideWidth <= 2 &&
         convInfo.outChannels / convInfo.inChannels === 1) {
       program = new DepthwiseConvPacked2DProgram(convInfo);
-      return this.compileAndRunCS(
+      return this.compileAndRun(
           program, [x, filter],
           this.makePackedTensor(convInfo.outShape, x.dtype));
     }
@@ -1962,7 +1968,7 @@ export class MathBackendWebGL implements KernelBackend {
     }
 
     program = new DepthwiseConv2DProgram(convInfo);
-    return this.compileAndRunCS(program, [x, filter]);
+    return this.compileAndRun(program, [x, filter]);
   }
 
   depthwiseConv2DDerInput(dy: Tensor4D, filter: Tensor4D, convInfo: Conv2DInfo):
@@ -2292,14 +2298,14 @@ export class MathBackendWebGL implements KernelBackend {
 
   private unpackTensor<T extends Tensor>(input: T|TensorHandle): T {
     const program = new UnpackProgram(input.shape);
-    return this.compileAndRunCS(
+    return this.compileAndRun(
         program, [input],
         Tensor.make(program.outputShape, {}, input.dtype, this));
   }
 
   private packTensor<T extends Tensor>(input: T|TensorHandle): T {
     const program = new PackProgram(input.shape);
-    return this.compileAndRunCS(
+    return this.compileAndRun(
         program, [input], this.makePackedTensor(input.shape, input.dtype));
   }
 
@@ -2315,7 +2321,7 @@ export class MathBackendWebGL implements KernelBackend {
     const program = new ReshapePackedProgram(
         afterShapeAs3D as [number, number, number],
         inputAs3D.shape as [number, number, number]);
-    return this.compileAndRunCS<Tensor<R>>(program, [inputAs3D])
+    return this.compileAndRun<Tensor<R>>(program, [inputAs3D])
         .reshape(afterShape);
   }
 

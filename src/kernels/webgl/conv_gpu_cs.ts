@@ -24,7 +24,7 @@ export class Conv2DProgramCS implements GPGPUProgram {
   userCode: string;
   localGroupSize: [number, number];  // x, y
 
-  constructor(convInfo: Conv2DInfo) {
+  constructor(convInfo: Conv2DInfo, localGroupSize: [number, number]) {
     this.outputShape = convInfo.outShape;
     const padTop = convInfo.padInfo.top;
     const padLeft = convInfo.padInfo.left;
@@ -38,7 +38,7 @@ export class Conv2DProgramCS implements GPGPUProgram {
     const inputDepthNearestVec4 = Math.floor(convInfo.inChannels / 4) * 4;
     const inputDepthVec4Remainder = convInfo.inChannels % 4;
 
-    this.localGroupSize = [8, 7];
+    this.localGroupSize = localGroupSize;
     // outWidth should be divisible by localGroupSize[1]
 
     this.userCode = `

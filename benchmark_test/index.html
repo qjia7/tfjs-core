@@ -1,0 +1,179 @@
+<html>
+
+<head>
+  <title>benchmarks</title>
+  <script src="../dist/tf-core.js"></script>
+  <script src="./conv2d_benchmark.js"></script>
+  <script src="./matmul_benchmark.js"></script>
+  <script src="./mobilenet_benchmark.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-layers@1.0.1/dist/tf-layers.min.js"></script>
+  <script type="text/javascript">
+    // for conv2dBenchmark
+    var LS_X1 = 32, LS_Y1 = 4; // case 1
+    var LS_X2 = 32, LS_Y2 = 7; // case 2
+    // for matMulBenchmark
+    var N = 1024, version = 0, LS = 32, TS = 16, WPT = 2; // version 0~3
+    var N4 = 1024, TSMN = 32, TSK = 16, WPTMN = 4;        // version 4
+    // for mobilenetBenchmark
+    var version_ = 0, LS_ = 32, TS_ = 16, WPT_ = 2;       // version 0~3
+
+    function showNumTensors() {
+      document.getElementById('numTensors').innerText =
+        `numTensors = ${tf.memory().numTensors}, numBytesInGPU = ${tf.memory().numBytesInGPU}`;
+    }
+  </script>
+
+  <style type="text/css">
+    h1 {
+      color: green
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Conv2d benchmark -->
+  <h1>Conv2d benchmark (Average 100)</h1>
+
+  <!-- Case 1 -->
+  <h2>Case 1: Ni=1, Hi=Wi=100, Ci=16, Hk=Wk=5, Co=32, stride=1, padding='same'</h2>
+  <p>LS_X, LS_Y: Local workgroup size</p>
+  <p id="conv2dOutput1"></p>
+  <input type="button" onclick="conv2dBenchmark1(LS_X1, LS_Y1)" value="Run" size="1">
+  LS_X=<select onchange="LS_X1=parseInt(this.options[this.selectedIndex].value)">
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+    <option value="64">64
+    <option value="96">96
+    <option value="128">128
+  </select>
+  LS_Y=<select onchange="LS_Y1=parseInt(this.options[this.selectedIndex].value)">
+    <option value="4" selected>4
+    <option value="10">10
+    <option value="20">20
+    <option value="25">25
+  </select>
+
+  <!-- Case 2 -->
+  <h2>Case 2: Ni=1, Hi=Wi=14, Ci=256, Hk=Wk=3, Co=256, stride=1, padding='same'</h2>
+  <p id="conv2dOutput2"></p>
+  <input type="button" onclick="conv2dBenchmark2(LS_X2, LS_Y2)" value="Run" size="1">
+  LS_X=<select onchange="LS_X2=parseInt(this.options[this.selectedIndex].value)">
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+    <option value="64">64
+    <option value="96">96
+    <option value="128">128
+  </select>
+  LS_Y=<select onchange="LS_Y2=parseInt(this.options[this.selectedIndex].value)">
+    <option value="7" selected>7
+    <option value="14">14
+  </select>
+
+
+  <!-- Matrix multiplication benchmark -->
+  <h1>Matrix multiplication benchmark (Average 100)</h1>
+
+  <!-- Version 0~3 -->
+  <h2>Version 0~3: </h2>
+  <p> 0 - MatMulPackedProgramCSV0 - naive
+    <br>1 - MatMulPackedProgramCSV1 - shared memory
+    <br>2 - MatMulPackedProgramCSV2 - more work per thread
+    <br>3 - MatMulPackedProgramCSV3 - 2D register blocking
+  </p>
+  <p>LS: Local workgroup size, only works in version 0
+    <br>TS: Tile size, works in version 1/2/3
+    <br>WPT: Work per thread, works in version 2/3
+  </p>
+  <p id="matmulOutput"></p>
+  <input type="button" onclick="matMulBenchmark(N, version, LS, TS, WPT)" value="Run" size="1">
+  N=<input value="1024" size="3" onchange="N=parseInt(this.value)">
+  version=<select onchange="version=parseInt(this.options[this.selectedIndex].value)">
+    <option value="0" selected>0
+    <option value="1">1
+    <option value="2">2
+    <option value="3">3
+  </select>
+  LS=<select onchange="LS=parseInt(this.options[this.selectedIndex].value)">
+    <option value="1">1
+    <option value="4">4
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+  </select>
+  TS=<select onchange="TS=parseInt(this.options[this.selectedIndex].value)">
+    <option value="8">8
+    <option value="16" selected>16
+    <option value="32">32
+  </select>
+  WPT=<select onchange="WPT=parseInt(this.options[this.selectedIndex].value)">
+    <option value="2" selected>2
+    <option value="4">4
+    <option value="8">8
+  </select>
+
+  <!-- Version 4 -->
+  <h2> Version 4: MatMulPackedProgramCSV4 - shader6</h2>
+  <p> Rectangular tiles - No transpose</p>
+  <p id="matmulOutputV4"></p>
+  <input type="button" onclick="matMulBenchmarkV4(N4, TSMN, TSK, WPTMN)" value="Run" size="1">
+  N=<input value="1024" size="3" onchange="N4=parseInt(this.value)">
+  TSM/N=<select onchange="TSMN=parseInt(this.options[this.selectedIndex].value)">
+    <option value="4">4
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+    <option value="64">64
+  </select>
+  TSK=<select onchange="TSK=parseInt(this.options[this.selectedIndex].value)">
+    <option value="4">4
+    <option value="8">8
+    <option value="16" selected>16
+  </select>
+  WPTM/N=<select onchange="WPTMN=parseInt(this.options[this.selectedIndex].value)">
+    <option value="2">2
+    <option value="4" selected>4
+    <option value="8">8
+  </select>
+
+
+  <!-- MobileNet benchmark -->
+  <h1>MobileNet benchmark (Average 100)</h1>
+  <p>mobilenet_v1_1.0_224</p>
+  <p>based on matmul version 0~3</p>
+  <p id="mobilenetOutput"></p>
+  <input type="button" onclick="mobilenetBenchmark(version_, LS_, TS_, WPT_)" value="Run" size="1">
+  version=<select onchange="version_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="0" selected>0
+    <option value="1">1
+    <option value="2">2
+    <option value="3">3
+  </select>
+  LS=<select onchange="LS_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="1">1
+    <option value="4">4
+    <option value="8">8
+    <option value="16">16
+    <option value="32" selected>32
+  </select>
+  TS=<select onchange="TS_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="8">8
+    <option value="16" selected>16
+    <option value="32">32
+  </select>
+  WPT=<select onchange="WPT_=parseInt(this.options[this.selectedIndex].value)">
+    <option value="2" selected>2
+    <option value="4">4
+    <option value="8">8
+  </select>
+
+
+  <!-- Warning -->
+  <h1 style="color:red">Remember to F5 frequently because of memory leak</h1>
+  <p id="numTensors"></p>
+
+</body>
+
+</html>
